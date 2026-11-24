@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+<title>Cozy Winter 2 — Настройки</title>
+<style>
+  :root { --bg: #152031; --panel: #1c2a40; --line: #2c3f5c; --text: #e6efff; --mute: #92a6c6; --acc: #7cc4ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 "Segoe UI", system-ui, sans-serif; }
+  nav { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 12px 0; border-bottom: 1px solid var(--line); background: #111a29; position: sticky; top: 0; }
+  .tab { background: none; border: 0; color: var(--mute); padding: 8px 12px; border-radius: 8px 8px 0 0; cursor: pointer; font: inherit; }
+  .tab.active { background: var(--panel); color: var(--text); }
+  section { padding: 14px 18px 24px; }
+  .head { display: flex; align-items: center; justify-content: space-between; }
+  h2 { font-size: 17px; font-weight: 600; margin: 4px 0 12px; }
+  .row { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+  .row.slider label { display: flex; justify-content: space-between; color: var(--text); }
+  .val { color: var(--acc); font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: var(--acc); margin-top: 4px; }
+  .row.check { display: flex; gap: 8px; align-items: center; }
+  input[type=checkbox] { accent-color: var(--acc); width: 16px; height: 16px; }
+  .row.select { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font: inherit; }
+  button { font: inherit; }
+  .row.button button, .ghost { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 7px 14px; cursor: pointer; }
+  .row.button button:hover, .ghost:hover { border-color: var(--acc); }
+  .row.button { border-bottom: 0; display: inline-block; margin-right: 8px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="../dist/settings.js"></script>
+</body>
+</html>

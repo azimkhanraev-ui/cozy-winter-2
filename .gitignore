@@ -1,0 +1,6 @@
+node_modules/
+dist/
+release/
+*.log
+tests/tmp-profile/
+tests/shots/desktop*.png

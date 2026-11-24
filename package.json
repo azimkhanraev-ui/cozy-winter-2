@@ -1,0 +1,55 @@
+{
+  "name": "cozy-winter-2",
+  "productName": "Cozy Winter 2",
+  "version": "0.1.0",
+  "description": "Живой зимний слой поверх рабочего стола Windows",
+  "main": "dist/main.js",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/start.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "selftest": "node scripts/selftest.mjs",
+    "dist": "node scripts/build.mjs --prod && electron-builder --win nsis portable"
+  },
+  "devDependencies": {
+    "electron": "45.4.1",
+    "electron-builder": "*",
+    "esbuild": "*",
+    "typescript": "*",
+    "vitest": "*"
+  },
+  "build": {
+    "appId": "app.cozywinter2",
+    "productName": "Cozy Winter 2",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "static/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    },
+    "portable": {
+      "artifactName": "CozyWinter2-portable-${version}.exe"
+    }
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "electron-winstaller@5.4.0": true,
+    "electron@45.4.1": true
+  }
+}
