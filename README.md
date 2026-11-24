@@ -16,6 +16,7 @@ npm start            # оверлей поверх рабочего стола (
 npm start -- --windowed   # отладочное окно 1280×720 с тёмным фоном
 npm start -- --verbose    # + счётчик FPS и лог рендерера в консоль
 npm test             # юнит-тесты (vitest)
+npm run selftest     # запуск приложения в тестовом режиме, PNG в tests/shots/, PASS/FAIL
 npm run typecheck    # проверка типов
 ```
 

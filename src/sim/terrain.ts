@@ -72,7 +72,8 @@ export class SnowField {
     const s = this.seed;
     for (let i = 0; i < this.n; i++) {
       const x = i * COL_W;
-      this.base[i] = 3 + 3 * fbm1(x / 240, s + 11, 3) + 1.2 * fbm1(x / 37, s + 23, 2);
+      // мелкая составляющая слабая и с «плавающим» периодом — без одинаковых бугорков
+      this.base[i] = 3 + 3 * fbm1(x / 240, s + 11, 3) + 0.55 * fbm1(x / (45 + 25 * fbm1(x / 400, s + 29, 1)), s + 23, 2);
     }
     // Пологие бугры
     const bumps = Math.max(2, Math.round(this.width / 450));
@@ -112,11 +113,12 @@ export class SnowField {
       f[i] = 1 + 0.9 * fbm1(x / 610, s + 101, 3) + 0.3 * fbm1(x / 140, s + 131, 2);
     }
     // Зоны намётов
-    const zones = Math.max(2, Math.round((this.width / 1920) * r.int(3, 5)));
+    // Количество — по плотности на ширину, а не «на 1920 px»: на узком экране тоже несколько разных зон
+    const zones = Math.max(2, Math.round(this.width / 480 + r.range(-0.5, 1.5)));
     for (let k = 0; k < zones; k++) {
       const c = r.range(0, this.width);
-      const w = r.range(50, 260);
-      const amp = r.range(1, 3);
+      const w = r.range(40, 240);
+      const amp = r.range(0.6, 2.8);
       const sharp = r.range(1.2, 2.6);
       for (let i = 0; i < this.n; i++) {
         const d = (i * COL_W - c) / w;
@@ -124,7 +126,7 @@ export class SnowField {
       }
     }
     // Почти голые места (выдуваемые проплешины)
-    const bare = Math.max(1, Math.round((this.width / 1920) * r.int(3, 4)));
+    const bare = Math.max(1, Math.round(this.width / 560 + r.range(-0.4, 1)));
     for (let k = 0; k < bare; k++) {
       const c = r.range(0, this.width);
       const w = r.range(60, 220);
@@ -182,7 +184,8 @@ export class SnowField {
     const p = this.params;
     const f = lerp(1, this.field[i], p.unevenness);
     // Предел высоты тоже немного неравномерный — сугробы в зонах намётов могут быть выше.
-    const cap = p.maxHeight * lerp(1, clamp(0.55 + 0.35 * this.field[i], 0.5, 1.6), p.unevenness);
+    // Плавная (насыщающаяся f/(f+1.2)) зависимость от поля: сугроб получается куполом, а не плато, и не выше maxHeight.
+    const cap = p.maxHeight * lerp(1, Math.min(1.05, (1.25 * this.field[i]) / (this.field[i] + 1.2)), p.unevenness);
     const k = this.snow[i] / cap;
     const capF = k >= 1 ? 0 : 1 - k * k;
     return f * capF;
@@ -332,7 +335,8 @@ export class SnowField {
         // Открытое место: эрозия рыхлого слоя; наветренный склон (подъём по ветру) теряет больше.
         const slope = (top - prevTop) / COL_W;
         const expo = clamp(1 + slope * 2.5, 0.2, 3);
-        let e = 0.9 * power * expo * dt * Math.min(fresh[i], 6);
+        // ~10%/с рыхлого слоя при сильном ветре: метель перестраивает сугробы за минуты, а не сдувает всё за секунды
+        let e = 0.1 * power * expo * dt * Math.min(fresh[i], 6);
         e = Math.min(e, fresh[i], snow[i]);
         if (e > 0) {
           snow[i] -= e;
@@ -346,9 +350,9 @@ export class SnowField {
         fresh[i] += land;
         carried -= land;
         // Снежная пыль с гребней при сильном ветре
-        if (s > 0.75 && e > 0.004 && top >= prevTop) {
+        if (s > 0.75 && e > 0.0005 && top >= prevTop) {
           const nxt = i + dir;
-          if (nxt >= 0 && nxt < n && base[nxt] + snow[nxt] <= top && this.rng.chance(0.25 * (s - 0.6))) {
+          if (nxt >= 0 && nxt < n && base[nxt] + snow[nxt] <= top && this.rng.chance(0.04 * (s - 0.6))) {
             this.dust.push({ x: i * COL_W, h: top, amount: e });
           }
         }

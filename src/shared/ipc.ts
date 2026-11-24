@@ -9,6 +9,8 @@ export interface InitInfo {
   displayIndex: number;
   debug: boolean;
   seed: number;
+  /** Экспериментальные флаги рендера (из командной строки). */
+  exp: string[];
 }
 
 export type Command =

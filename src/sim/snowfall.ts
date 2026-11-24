@@ -46,8 +46,10 @@ export interface LayerSpec {
 
 /** 0 — дальний, 3 — ближний (перед «землёй», крупный и размытый). */
 export const LAYERS: LayerSpec[] = [
-  { rMin: 0.6, rMax: 1.2, speed: 24, windK: 0.4, alpha: 0.42, blur: 0, weight: 0.3, lands: false },
-  { rMin: 1.0, rMax: 1.9, speed: 38, windK: 0.65, alpha: 0.7, blur: 0, weight: 0.32, lands: true },
+  // Дальние слои падают медленно и поэтому составляют большинство хлопьев на экране; их доля
+  // подобрана так, чтобы глубина читалась, но число draw-call (главная статья CPU) оставалось умеренным.
+  { rMin: 0.6, rMax: 1.2, speed: 24, windK: 0.4, alpha: 0.5, blur: 0, weight: 0.12, lands: false },
+  { rMin: 1.0, rMax: 1.9, speed: 38, windK: 0.65, alpha: 0.78, blur: 0, weight: 0.24, lands: true },
   { rMin: 1.7, rMax: 3.2, speed: 58, windK: 0.9, alpha: 0.92, blur: 0.4, weight: 0.3, lands: true },
   { rMin: 4.5, rMax: 8.5, speed: 105, windK: 1.25, alpha: 0.5, blur: 2.5, weight: 0.08, lands: false },
 ];

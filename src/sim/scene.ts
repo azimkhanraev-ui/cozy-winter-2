@@ -70,18 +70,18 @@ export class Scene {
     if (!ev.length) return;
     const r = this.rng;
     for (const e of ev) {
-      if (this.particles.length > 600) break;
-      const n = 1 + Math.min(4, Math.floor(e.amount * 200));
+      if (this.particles.length > 220) break;
+      const n = 1 + Math.min(3, Math.floor(e.amount * 800));
       for (let k = 0; k < n; k++) {
         this.particles.push({
           kind: 'dust',
           x: e.x + r.range(-3, 3),
           y: this.height - e.h - r.range(0, 3),
           vx: this.wind.value * r.range(0.6, 1.2),
-          vy: -r.range(8, 30),
+          vy: -r.range(15, 55),
           life: 0,
-          maxLife: r.range(0.8, 2.2),
-          r: r.range(0.6, 1.6),
+          maxLife: r.range(0.6, 1.6),
+          r: r.range(0.5, 1.2),
         });
       }
     }
@@ -98,7 +98,8 @@ export class Scene {
         continue;
       }
       p.vx += (this.wind.at(p.x, p.y) - p.vx) * dt * 1.5;
-      p.vy += 12 * dt;
+      p.vy += 18 * dt;
+      p.vy *= 1 - dt * 0.8;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
     }

@@ -7,7 +7,9 @@ const STEP = 6; // px между опорными точками кривой
 
 export class GroundRenderer {
   readonly canvas = document.createElement('canvas');
-  private g = this.canvas.getContext('2d')!;
+  // Программная растеризация: сложные пути с клипом и сотни мелких точек рисуются ~5 раз/с на CPU,
+  // а не нагружают GPU-процесс командами; на GPU уходит только готовая текстура.
+  private g = this.canvas.getContext('2d', { willReadFrequently: true })!;
   private bandH = 0;
   private width = 0;
   private dpr = 1;
@@ -32,7 +34,7 @@ export class GroundRenderer {
   }
 
   /** Перерисовать, если карта изменилась (не чаще чем раз в minIntervalMs). */
-  update(field: SnowField, now: number, minIntervalMs = 66, force = false): void {
+  update(field: SnowField, now: number, minIntervalMs = 200, force = false): void {
     if (!force && (field.revision === this.lastRev || now - this.lastDraw < minIntervalMs)) return;
     this.lastRev = field.revision;
     this.lastDraw = now;
@@ -140,18 +142,23 @@ export class GroundRenderer {
       ao.addColorStop(t, `rgba(128,160,220,${(0.06 + 0.4 * concave + 0.12 * thin).toFixed(3)})`);
     }
     g.lineJoin = 'round';
-    // широкая мягкая «окклюзия» во впадинах
-    g.strokeStyle = ao;
-    g.lineWidth = 34;
-    g.beginPath();
-    this.curve(g, h, B, 10);
-    g.stroke();
+    // Мягкие полосы: несколько вложенных штрихов с малой прозрачностью дают плавный спад без резких краёв.
+    const soft = (style: CanvasGradient, width: number, offset: number) => {
+      const path = new Path2D();
+      path.moveTo(-STEP, B - h[0] + offset);
+      this.curve(shapeProxy(path), h, B, offset);
+      g.strokeStyle = style;
+      for (const k of [1, 0.75, 0.5, 0.25]) {
+        g.globalAlpha = 0.3;
+        g.lineWidth = width * k;
+        g.stroke(path);
+      }
+      g.globalAlpha = 1;
+    };
+    // широкая «окклюзия» во впадинах
+    soft(ao, 44, 8);
     // направленный свет
-    g.strokeStyle = lit;
-    g.lineWidth = 12;
-    g.beginPath();
-    this.curve(g, h, B, 3);
-    g.stroke();
+    soft(lit, 16, 2);
 
     // нижняя глубина (у самой земли снег плотнее и голубее)
     const deep = g.createLinearGradient(0, B - 14, 0, B);

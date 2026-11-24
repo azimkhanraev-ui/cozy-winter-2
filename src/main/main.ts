@@ -277,6 +277,9 @@ function broadcastCommand(c: Command): void {
 // ---------- скриншоты ----------
 
 async function capture(win: BrowserWindow, name: string): Promise<string> {
+  // Сценарий может закончиться раньше, чем окно показано, — тогда снимок был бы пустым.
+  if (!win.isVisible()) await new Promise((r) => win.once('show', () => r(null)));
+  await new Promise((r) => setTimeout(r, 250));
   const img = await win.webContents.capturePage();
   fs.mkdirSync(ARGS.shotDir, { recursive: true });
   const file = path.join(ARGS.shotDir, `${name}.png`);
@@ -317,7 +320,9 @@ async function trayCheck(): Promise<boolean> {
   fire(buildTrayMenu().items.find((i) => i.label === T('Пауза', 'Pause')));
   results.push(['pause off', store.settings.paused === false]);
   fire(find(T('Настройки…', 'Settings…')));
-  await new Promise((r) => setTimeout(r, 1500));
+  // ждём, пока окно реально покажется (до 8 с), а не фиксированную паузу
+  for (let i = 0; i < 80 && !(settingsWin && settingsWin.isVisible()); i++) await new Promise((r) => setTimeout(r, 100));
+  await new Promise((r) => setTimeout(r, 300));
   results.push(['settings window opened', !!settingsWin && !settingsWin.isDestroyed() && settingsWin.isVisible()]);
   if (settingsWin) await capture(settingsWin, 'stage1-settings');
   const modeSub = find(T('Режим', 'Mode'))?.submenu;
@@ -346,6 +351,7 @@ function infoFor(sender: Electron.WebContents): InitInfo {
     scenario: ARGS.scenario,
     displayIndex: entry?.displayIndex ?? 0,
     debug: ARGS.debug,
+    exp: argv.filter((a) => a.startsWith('--exp-')).map((a) => a.slice(6)),
     seed: ARGS.seed || (entry?.displayIndex ?? 0) * 101 + (TEST_MODE ? 7 : (Date.now() % 100000)),
   };
 }
@@ -366,6 +372,7 @@ ipcMain.on('scenario-done', async (e, name: string, info: unknown) => {
   const entry = [...sceneWins.values()].find((s) => s.win === w);
   const tag = `${name}-${entry?.overlay ? 'overlay' + entry.displayIndex : 'windowed'}`;
   await capture(w, tag);
+  if (ARGS.desktopShot) await captureDesktop(tag);
   console.log(`[scenario] ${tag} ${JSON.stringify(info)}`);
   if (ARGS.exitAfter) {
     quitting = true;

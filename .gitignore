@@ -4,3 +4,5 @@ release/
 *.log
 tests/tmp-profile/
 tests/shots/desktop*.png
+tests/tmp-selftest/
+tests/tmp-cpu/

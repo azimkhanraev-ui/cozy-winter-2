@@ -14,7 +14,11 @@ declare global {
 
 const api = window.cozy;
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
-const ctx = canvas.getContext('2d', { alpha: true })!;
+/** Отдельный холст для дальних слоёв: они двигаются < 1 px за кадр и обновляются через кадр. */
+const farCanvas = document.getElementById('far') as HTMLCanvasElement;
+let ctx: CanvasRenderingContext2D = null as unknown as CanvasRenderingContext2D;
+let farCtx: CanvasRenderingContext2D = null as unknown as CanvasRenderingContext2D;
+let frameNo = 0;
 const fpsEl = document.getElementById('fps') as HTMLDivElement;
 
 let info: InitInfo;
@@ -37,10 +41,12 @@ function resize(): void {
   dpr = Math.min(2, window.devicePixelRatio || 1);
   W = window.innerWidth;
   H = window.innerHeight;
-  canvas.width = Math.round(W * dpr);
-  canvas.height = Math.round(H * dpr);
-  canvas.style.width = W + 'px';
-  canvas.style.height = H + 'px';
+  for (const c of [canvas, farCanvas]) {
+    c.width = Math.round(W * dpr);
+    c.height = Math.round(H * dpr);
+    c.style.width = W + 'px';
+    c.style.height = H + 'px';
+  }
   if (scene) scene.resize(W, H);
   ensureGround();
 }
@@ -63,13 +69,18 @@ function applySettings(s: Settings): void {
   if (s.paused) render(0);
 }
 
-function render(dt: number): void {
+function render(dt: number, full = true): void {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
+  if (info.exp.includes('blank')) return; // эксперимент: стоимость пустого кадра
   const t = scene.wind.time;
   const fl = scene.snowfall.flakes;
-  // дальние слои → снег на земле → средний слой → пыль/искорки → ближний слой
-  snowR.drawFlakes(ctx, fl, [0, 1], t, dpr);
+  // дальние слои (свой холст, через кадр) → снег на земле → средний слой → пыль/искорки → ближний слой
+  if (full || (frameNo++ & 1) === 0) {
+    farCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    farCtx.clearRect(0, 0, W, H);
+    snowR.drawFlakes(farCtx, fl, [0, 1], t, dpr);
+  }
   ground.update(scene.field, performance.now());
   ground.draw(ctx, H);
   snowR.drawFlakes(ctx, fl, [2], t, dpr);
@@ -97,7 +108,7 @@ function frame(now: number): void {
   }
   if (acc > FIXED_DT * 4) acc = 0; // не догоняем после долгих пауз
   if (scene.field.revision % 30 === 0) ensureGround();
-  render(dtMs / 1000);
+  render(dtMs / 1000, settings.fpsLimit <= 30);
   if (info.debug) {
     fpsFrames++;
     if (now - fpsT > 1000) {
@@ -166,6 +177,31 @@ async function runScenario(name: string): Promise<void> {
     api.scenarioDone(name, { simMs: ms, mean: +(sum / f.n).toFixed(1), min: +min.toFixed(1), max: +max.toFixed(1), slopeViolation: +f.maxSlopeViolation().toFixed(3) });
     return;
   }
+  if (name === 'blizzard') {
+    // Метель: сильный ветер с порывами поверх накопленного снега — намёты, пыль с гребней.
+    scene.apply({ windBase: 200, gustiness: 0.9, snowfall: { intensity: 0.9 } });
+    scene.fastForward(600);
+    ensureGround();
+    ground.update(scene.field, performance.now(), 0, true);
+    render(FIXED_DT);
+    await nextFrame();
+    api.scenarioDone(name, { particles: scene.particles.length, wind: Math.round(scene.wind.value) });
+    return;
+  }
+  if (name === 'dustnow') {
+    // «Присыпать сразу» на пустой земле.
+    scene.field.clear();
+    scene.dustNow();
+    ensureGround();
+    ground.update(scene.field, performance.now(), 0, true);
+    render(FIXED_DT);
+    await nextFrame();
+    const f = scene.field;
+    let max = 0, sum = 0;
+    for (let i = 0; i < f.n; i++) { max = Math.max(max, f.snow[i]); sum += f.snow[i]; }
+    api.scenarioDone(name, { mean: +(sum / f.n).toFixed(1), max: +max.toFixed(1), slopeViolation: +f.maxSlopeViolation().toFixed(3) });
+    return;
+  }
   if (name === 'idle') {
     for (let i = 0; i < 90; i++) await nextFrame();
     api.scenarioDone(name, { flakes: scene.snowfall.flakes.length });
@@ -178,6 +214,8 @@ async function runScenario(name: string): Promise<void> {
 (async () => {
   info = await api.init();
   settings = info.settings;
+  ctx = canvas.getContext('2d', { alpha: true })!;
+  farCtx = farCanvas.getContext('2d', { alpha: true })!;
   if (info.windowed) document.body.classList.add('windowed');
   if (info.debug) fpsEl.style.display = 'block';
   resize();
