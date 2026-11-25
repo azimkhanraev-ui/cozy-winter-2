@@ -5,13 +5,14 @@
 катаются шары, из трёх шаров собирается снеговик. Ездит снегоуборщик, меняется время суток, стоит домик
 с тёплыми окнами. Клики по рабочему столу проходят сквозь снег.
 
-## Установка
+## Скачать
 
-В `release/` после сборки лежат:
-- `CozyWinter2-Setup-1.0.0.exe` — установщик (без прав администратора, в профиль пользователя);
-- `CozyWinter2-Portable-1.0.0.exe` — переносная версия, ничего не устанавливает.
+- **[Установщик для Windows](https://github.com/azimkhanraev-ui/cozy-winter-2/releases/latest/download/CozyWinter2-Setup.exe)** — ставится в профиль пользователя, без прав администратора.
+- **[Переносная версия](https://github.com/azimkhanraev-ui/cozy-winter-2/releases/latest/download/CozyWinter2-Portable.exe)** — запускается без установки.
+- [Сайт с живым демо](https://azimkhanraev-ui.github.io/cozy-winter-2/) · [все версии](https://github.com/azimkhanraev-ui/cozy-winter-2/releases)
 
-После запуска в трее появится снежинка.
+Программа без цифровой подписи, поэтому при первом запуске Windows может показать окно SmartScreen:
+нажмите «Подробнее» → «Выполнить в любом случае». После запуска в трее появится снежинка.
 
 ## Как пользоваться
 
@@ -78,7 +79,8 @@ npm test                     # юнит-тесты (vitest): физика сне
 npm run typecheck            # проверка типов
 npm run selftest             # приложение в тестовом режиме: сценарии + реальный ввод мышью, PNG в tests/shots/
 npm run dist                 # установщик NSIS и portable .exe в release/
-node scripts/dist.mjs --out=D:\CozyWinter2elease   # то же, но в другую папку (если на C: мало места)
+node scripts/dist.mjs --out=D:\CozyWinter2
+elease   # то же, но в другую папку (если на C: мало места)
 npm run site                 # сайт с живым демо → website/ (открыть website/index.html)
 ```
 
