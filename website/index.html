@@ -53,11 +53,15 @@
 
 <section id="download" class="download">
   <h2>Скачать</h2>
-  <p><a class="btn" href="#build" data-download>Скачать для Windows</a></p>
+  <p><a class="btn" href="#build" data-download>Скачать установщик</a></p>
+  <p><a href="#build" data-portable>Переносная версия (без установки)</a> · <a href="#build" data-releases>Все версии на GitHub</a></p>
+  <p class="muted small">Программа без цифровой подписи: при первом запуске Windows может показать окно SmartScreen — нажмите «Подробнее» → «Выполнить в любом случае».</p>
   <p class="muted" id="dl-note">Установщик или переносная версия (без установки). После запуска в трее появится снежинка, инструменты — по клику на неё внизу экрана или <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd>.</p>
   <div id="build" class="build">
     <h3>Собрать самому</h3>
-    <p>Нужен Node.js 20+:</p>
+    <p>Нужен Node.js 20+. Исходный код — <a href="https://github.com/azimkhanraev-ui/cozy-winter-2">на GitHub</a>.</p>
+    <pre><code>git clone https://github.com/azimkhanraev-ui/cozy-winter-2.git
+cd cozy-winter-2</code></pre>
     <pre><code>npm install
 npm start          # запустить
 npm run dist       # установщик и portable .exe в release/</code></pre>
@@ -72,9 +76,12 @@ npm run dist       # установщик и portable .exe в release/</code></p
 <script>
   // кнопки «Скачать»: на страницу релизов GitHub, если она указана в config.js
   (function () {
-    var url = (window.COZY_SITE && window.COZY_SITE.releasesUrl) || '';
-    if (!url) return;
-    document.querySelectorAll('[data-download]').forEach(function (a) { a.href = url; a.rel = 'noopener'; });
+    var c = window.COZY_SITE || {};
+    if (!c.releasesUrl) return;
+    var set = function (sel, url) { document.querySelectorAll(sel).forEach(function (a) { a.href = url; a.rel = 'noopener'; }); };
+    set('[data-download]', c.setupUrl || c.releasesUrl);
+    set('[data-portable]', c.portableUrl || c.releasesUrl);
+    set('[data-releases]', c.releasesUrl);
     var b = document.getElementById('build');
     if (b) b.querySelector('h3').textContent = 'Или собрать самому';
   })();
