@@ -347,9 +347,14 @@ export class Scene {
         case 'swirl': {
           // вихрь «снежного шара»: частица кружит вокруг центра, потом падает носителем
           const tSw = 2.6;
+          if (p.life < 0) {
+            // ещё не взлетела — лежит у земли
+            dead = false;
+            continue;
+          }
           if (p.life < tSw) {
-            p.ang! += dt * (2.4 + 140 / (p.rad! + 30));
-            p.rad! += dt * 25 * Math.sin(p.life * 2 + p.ang!);
+            p.ang! += dt * (1.6 + 160 / (p.rad! + 40));
+            p.rad! += dt * 30 * Math.sin(p.life * 1.7 + p.ang! * 0.5);
             const nx = p.cx! + Math.cos(p.ang!) * p.rad!;
             const ny = p.cy! + Math.sin(p.ang!) * p.rad! * 0.55;
             p.vx = (nx - p.x) / dt;

@@ -1,7 +1,7 @@
 {
   "name": "cozy-winter-2",
   "productName": "Cozy Winter 2",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Живой зимний слой поверх рабочего стола Windows",
   "main": "dist/main.js",
   "private": true,
@@ -12,7 +12,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "selftest": "node scripts/selftest.mjs",
-    "dist": "node scripts/build.mjs --prod && electron-builder --win nsis portable"
+    "dist": "node scripts/dist.mjs",
+    "icon": "node scripts/make-icon.mjs"
   },
   "devDependencies": {
     "electron": "45.4.1",
@@ -24,32 +25,48 @@
   "build": {
     "appId": "app.cozywinter2",
     "productName": "Cozy Winter 2",
+    "copyright": "Cozy Winter 2",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
-      "dist/**/*",
+      "dist/main.js",
+      "dist/preload.js",
+      "dist/overlay.js",
+      "dist/settings.js",
       "static/**/*",
       "package.json"
+    ],
+    "asarUnpack": [
+      "static/winhelper.*"
     ],
     "win": {
       "target": [
         "nsis",
         "portable"
-      ]
+      ],
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "perMachine": false
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Cozy Winter 2",
+      "artifactName": "CozyWinter2-Setup-${version}.${ext}",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
     },
     "portable": {
-      "artifactName": "CozyWinter2-portable-${version}.exe"
+      "artifactName": "CozyWinter2-Portable-${version}.${ext}"
     }
   },
   "allowScripts": {
     "esbuild@0.28.2": true,
     "electron-winstaller@5.4.0": true,
     "electron@45.4.1": true
-  }
+  },
+  "author": "Cozy Winter 2"
 }

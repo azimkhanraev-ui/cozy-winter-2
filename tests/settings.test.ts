@@ -28,3 +28,36 @@ describe('настройки', () => {
     expect(s.drift.maxHeight).toBe(DEFAULT_SETTINGS.drift.maxHeight);
   });
 });
+
+describe('настройки этапов 3–9', () => {
+  it('пресеты времени суток: значения 0..100, цвета только #rrggbb', () => {
+    const s = sanitizeSettings({ day: { presets: { night: { stars: 500, skyTop: 'red', tint: '#ABCDEF' } } } });
+    expect(s.day.presets.night.stars).toBe(100);
+    expect(s.day.presets.night.skyTop).toBe(DEFAULT_SETTINGS.day.presets.night.skyTop);
+    expect(s.day.presets.night.tint).toBe('#abcdef');
+    expect(s.day.presets.day).toEqual(DEFAULT_SETTINGS.day.presets.day);
+  });
+
+  it('перечисления и диапазоны новых разделов', () => {
+    const s = sanitizeSettings({ tools: { current: 'bazooka', size: 5000 }, plow: { count: 9, direction: 'up' }, system: { economy: 'max' } });
+    expect(s.tools.current).toBe(DEFAULT_SETTINGS.tools.current);
+    expect(s.tools.size).toBe(200);
+    expect(s.plow.count).toBe(3);
+    expect(s.plow.direction).toBe('alternate');
+    expect(s.system.economy).toBe('auto');
+  });
+
+  it('частичный патч пресета фазы не затирает остальные поля', () => {
+    const s = mergeSettings(DEFAULT_SETTINGS, { day: { presets: { evening: { moon: 10 } } } });
+    expect(s.day.presets.evening.moon).toBe(10);
+    expect(s.day.presets.evening.stars).toBe(DEFAULT_SETTINGS.day.presets.evening.stars);
+  });
+
+  it('пресеты настроек дают корректные настройки', async () => {
+    const { PRESETS } = await import('../src/shared/settings');
+    for (const p of Object.values(PRESETS)) {
+      const s = mergeSettings(DEFAULT_SETTINGS, p.patch());
+      expect(sanitizeSettings(s)).toEqual(s);
+    }
+  });
+});

@@ -231,3 +231,7 @@ registerTool('tree', {
     h.sfx('puff', 0.3);
   },
 });
+
+export function decorModule(): DecorModule | null {
+  return decor;
+}

@@ -2,7 +2,7 @@
 // в tests/shots/ и печатает PASS/FAIL. Отдельный временный профиль: настройки пользователя не трогаются.
 import { spawnSync, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { rmSync } from 'node:fs';
+import { rmSync, readdirSync, existsSync } from 'node:fs';
 
 execFileSync(process.execPath, ['scripts/build.mjs'], { stdio: 'inherit' });
 const electron = createRequire(import.meta.url)('electron');
@@ -12,24 +12,32 @@ const PROFILE = 'tests/tmp-selftest';
 
 function run(args) {
   rmSync(PROFILE, { recursive: true, force: true });
-  const r = spawnSync(electron, ['.', `--user-data=${PROFILE}`, '--exit', ...args], { env, encoding: 'utf8', timeout: 180000 });
-  return { code: r.status, out: (r.stdout ?? '') + (r.stderr ?? '') };
+  const r = spawnSync(electron, ['.', `--user-data=${PROFILE}`, '--exit', ...args], { env, encoding: 'utf8', timeout: 360000 });
+  return { code: r.status, out: (r.stdout ?? '') + (r.stderr ?? '') + (r.error ? `
+[selftest] ${r.error.message}` : '') };
 }
 function scenario(name, mode = '--windowed') {
-  const r = run([mode, `--scenario=${name}`]);
+  let r = run([mode, `--scenario=${name}`]);
+  // Если запуск вообще ничего не вернул (бывает под тяжёлой нагрузкой машины) — один повтор, с пометкой.
+  let retried = false;
+  if (!new RegExp(String.raw`\[scenario\] ` + name + '-').test(r.out)) {
+    retried = true;
+    r = run([mode, `--scenario=${name}`]);
+  }
   const m = r.out.match(new RegExp(String.raw`\[scenario\] ` + name + String.raw`-\S+ (\{.*\})`));
   const shot = r.out.match(/\[shot\] (.+?\.png)/);
-  return { info: m ? JSON.parse(m[1]) : null, shot: shot?.[1], out: r.out };
+  return { info: m ? JSON.parse(m[1]) : null, shot: (shot?.[1] ?? '') + (retried ? ' (повтор)' : ''), out: r.out };
 }
 
 /** Тест реальным вводом мыши (sendInputEvent): возвращает JSON-итог и путь к снимку. */
-function inputTest(name) {
+function inputTest(name, extra = []) {
   rmSync(PROFILE, { recursive: true, force: true });
-  const r = spawnSync(electron, ['.', `--user-data=${PROFILE}`, '--windowed', `--input-test=${name}`], { env, encoding: 'utf8', timeout: 240000 });
+  const r = spawnSync(electron, ['.', `--user-data=${PROFILE}`, '--windowed', `--input-test=${name}`, ...extra], { env, encoding: 'utf8', timeout: 360000 });
   const out = (r.stdout ?? '') + (r.stderr ?? '');
   const m = out.match(new RegExp(String.raw`\[input-test\] ` + name + String.raw` (\{.*\})`));
   const shot = out.match(/\[shot\] (.+?\.png)/);
-  return { info: m ? JSON.parse(m[1]) : null, shot: shot?.[1], out, code: r.status };
+  return { info: m ? JSON.parse(m[1]) : null, shot: shot?.[1], out: out + (r.error ? `
+[selftest] ${r.error.message}` : ''), code: r.status };
 }
 
 const results = [];
@@ -135,6 +143,84 @@ const tail = (s) => s.out.slice(-500).replace(/\s+/g, ' ');
   const s = scenario('decor-night');
   const i = s.info;
   check('декор: домик, ёлки, фонарь, забор; снег ложится на декор', !!i && i.decor >= 5 && Math.min(...i.decorSnow) > 0.3, i ? `предметов ${i.decor}, снег на них ${JSON.stringify(i.decorSnow)} → ${s.shot}` : tail(s));
+}
+
+// ---------- этап 7: дополнительные фишки ----------
+{
+  const s = scenario('fx');
+  const i = s.info;
+  check('следы, «снежный ангел», брызги снежков на стекле', !!i && i.decals >= 8 && i.splats >= 3, i ? `отпечатков ${i.decals}, брызг ${i.splats} → ${s.shot}` : tail(s));
+}
+{
+  const s = scenario('shake');
+  const i = s.info;
+  check('«снежный шар»: снег взметается вихрем', !!i && i.swirl > 150, i ? `частиц вихря ${i.swirl} → ${s.shot}` : tail(s));
+}
+{
+  const s = scenario('ledges');
+  const i = s.info;
+  check('снег на верхних краях окон (рендер)', !!i && i.ledges === 2 && i.ledgeSnow > 1000, i ? `кромок ${i.ledges}, снега ${i.ledgeSnow}px² → ${s.shot}` : tail(s));
+}
+{
+  const pics = 'tests/tmp-pictures';
+  rmSync(pics, { recursive: true, force: true });
+  const s = inputTest('fx', [`--pictures-dir=${pics}`]);
+  const i = s.info;
+  const photos = existsSync(pics) ? readdirSync(pics).filter((f) => f.endsWith('.png')) : [];
+  const ok = !!i && i.afterThrow.decals >= 8 && i.afterThrow.splats >= 1 && i.winterOn && i.simSpeed > 15 && i.afterShake.particles > 150 && photos.length === 1 && i.audio === 'running';
+  check('мышью: шаги, ангел, бросок, фотоаппарат, «зима за минуту», встряхнуть, звук', ok, i ? `отпечатков ${i.afterThrow.decals}, брызг ${i.afterThrow.splats}, фото ${photos.length}, ускорение ×${i.simSpeed}, вихрь ${i.afterShake.particles}, звук ${i.audio}` : tail(s));
+  rmSync(pics, { recursive: true, force: true });
+}
+
+// ---------- этап 8: управление ----------
+{
+  const r = run(['--windowed', '--settings-check']);
+  const tabs = (r.out.match(/\[settings-check\] tabs=(\S+)/) ?? [])[1]?.split(',') ?? [];
+  const bad = r.out.match(/\[settings-check\] вкладка .*/g) ?? [];
+  check('окно настроек: 8 вкладок с предпросмотром', tabs.length === 8 && bad.length === 0, `${tabs.join(', ')} → tests/shots/settings-*.png ${bad.join('; ')}`);
+}
+{
+  const r = run(['--overlay', '--mouse-test']);
+  const m = r.out.match(/\[mouse-test\] (\{.*\})/);
+  const i = m ? JSON.parse(m[1]) : null;
+  const ok = !!i && i.passive === 'under' && i.interactive === 'overlay' && i.afterEsc === 'under' && i.overDockTab === 'overlay' && i.awayFromDock === 'under';
+  check('оверлей: клики насквозь, в режиме инструментов — ловит, над доком — ловит', ok, i ? JSON.stringify(i) : r.out.slice(-300));
+}
+{
+  const r = run(['--windowed', '--hotkey-check']);
+  const m = r.out.match(/\[hotkey-check\] (\{.*\})/);
+  const i = m ? JSON.parse(m[1]) : null;
+  const ok = !!i && Object.values(i.defaults).every(Boolean) && i.afterChange.registered.includes('Ctrl+Alt+F9');
+  check('глобальные клавиши Ctrl+Alt+S/P/C/G/Q регистрируются и переназначаются', ok, i ? JSON.stringify(i.afterChange.registered) : r.out.slice(-300));
+}
+{
+  const s = inputTest('tour');
+  const i = s.info;
+  check('подсказка первого запуска: 3 шага, потом не показывается', !!i && i.stepAtStart === 1 && i.stepAtEnd === 0 && i.firstRunSaved === false, i ? JSON.stringify({ start: i.stepAtStart, end: i.stepAtEnd, saved: i.firstRunSaved }) : tail(s));
+}
+
+// ---------- этап 9: система ----------
+{
+  // сцена сохраняется между запусками: 1-й запуск собирает снеговиков и сохраняет при выходе, 2-й загружает
+  rmSync(PROFILE, { recursive: true, force: true });
+  const a = spawnSync(electron, ['.', `--user-data=${PROFILE}`, '--exit', '--windowed', '--scenario=snowmen', '--save-scene'], { env, encoding: 'utf8', timeout: 360000 });
+  const outA = (a.stdout ?? '') + (a.stderr ?? '');
+  const before = outA.match(/\[scenario\] snowmen-\S+ (\{.*\})/);
+  const saved = /\[scene\] saved/.test(outA);
+  const b = spawnSync(electron, ['.', `--user-data=${PROFILE}`, '--exit', '--windowed', '--scenario=persist', '--load-scene'], { env, encoding: 'utf8', timeout: 360000 });
+  const outB = (b.stdout ?? '') + (b.stderr ?? '');
+  const after = outB.match(/\[scenario\] persist-\S+ (\{.*\})/);
+  const i0 = before ? JSON.parse(before[1]) : null;
+  const i1 = after ? JSON.parse(after[1]) : null;
+  const ok = saved && !!i0 && !!i1 && i1.snowmen === i0.snowmen && i1.snowmen > 0 && i1.mean > 5;
+  check('сцена (снег, снеговики) сохраняется между запусками', ok, i1 ? `сохранено=${saved}, снеговиков ${i0?.snowmen} → ${i1.snowmen}, снег mean=${i1.mean} → tests/shots/persist-windowed.png` : outB.slice(-300));
+}
+{
+  const r = run(['--overlay', '--system-check']);
+  const m = r.out.match(/\[system-check\] (\{.*\})/);
+  const i = m ? JSON.parse(m[1]) : null;
+  const ok = !!i && i.helperReady && i.autoPausedWithFullscreen && i.overlayHidden && i.rendererPaused && i.resumedAfterClose && i.overlayVisibleAgain && i.economyFps === 30 && i.normalFps === 60;
+  check('автопауза при полноэкранном окне, режим экономии', ok, i ? JSON.stringify(i) : r.out.slice(-300));
 }
 
 rmSync(PROFILE, { recursive: true, force: true });

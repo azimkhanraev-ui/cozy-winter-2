@@ -11,7 +11,7 @@ import { cursorCSS, IconId } from '../render/icons';
 import { sceneParamsFrom } from './mapSettings';
 import { toolRegistry, brushSize, PointerInfo, ToolHost } from './tools';
 import { Dock, BALL_PRESETS } from './dock';
-import { App, Hit, Light, overlayModules } from './app';
+import { App, Hit, Light, overlayModules, audioHooks } from './app';
 import './modules';
 
 declare global {
@@ -41,11 +41,6 @@ const DAY_LIGHT: Light = {
   windowLight: 0, garland: 0, stars: 0, moon: 0, sun: 0, aurora: 0, hour: 12, night: 0,
 };
 
-/** Подменяется модулем звука. */
-let sfxHook: (name: string, power: number) => void = () => {};
-export function setSfxHook(f: (name: string, power: number) => void): void {
-  sfxHook = f;
-}
 
 const app: App = {
   api,
@@ -64,13 +59,12 @@ const app: App = {
     api.historyPushed();
   },
   sfx(name, power = 1) {
-    sfxHook(name, power);
+    audioHooks.play(name, power);
   },
   toast(text) {
     showToast(text);
   },
 };
-(window as unknown as { __setSfx: typeof setSfxHook }).__setSfx = setSfxHook;
 
 let dock: Dock | null = null;
 let running = false;
@@ -286,7 +280,7 @@ function stop(): void {
   cancelAnimationFrame(rafId);
 }
 
-/** События сцены → звуки (модуль звука подменяет sfxHook). */
+/** События сцены → звуки (модуль звука подменяет audioHooks.play). */
 function flushEvents(): void {
   const ev = app.scene.events;
   for (const e of ev) app.sfx(e.type, e.power ?? 1);
@@ -353,6 +347,7 @@ function trackVelocity(e: MouseEvent): void {
 }
 
 window.addEventListener('mousemove', (e) => {
+  if (!app.ui || !app.scene) return; // событие до инициализации
   const prev = { ...cur };
   trackVelocity(e);
   app.cursor = { x: e.clientX, y: e.clientY };
@@ -369,6 +364,7 @@ window.addEventListener('mousemove', (e) => {
 });
 
 document.addEventListener('mouseleave', () => {
+  if (!app.ui) return;
   app.cursor = null;
   if (!pointer) {
     hovering = null;
@@ -377,6 +373,7 @@ document.addEventListener('mouseleave', () => {
 });
 
 window.addEventListener('mousedown', (e) => {
+  if (!app.ui || !app.scene) return;
   if (overUi(e.clientX, e.clientY, e.target)) return;
   trackVelocity(e);
   cur.button = e.button;
@@ -436,7 +433,7 @@ function holdTool(dt: number): void {
 window.addEventListener('contextmenu', (e) => e.preventDefault());
 
 window.addEventListener('wheel', (e) => {
-  if (!app.ui.interactive) return;
+  if (!app.ui?.interactive) return;
   const s = app.settings;
   const d = e.deltaY < 0 ? 1 : -1;
   if (app.ui.tool === 'ball') api.patchSettings({ tools: { ballSize: Math.max(8, Math.min(90, s.tools.ballSize + d * 2)) } });
@@ -587,6 +584,13 @@ async function runScenario(name: string): Promise<void> {
     api.scenarioDone(name, { volumeBefore: Math.round(before), volumeAfter: Math.round(after), volumeDelta: +(after / before - 1).toFixed(4), stripMax: +stripMax.toFixed(1), slopeViolation: +f.maxSlopeViolation().toFixed(3) });
     return;
   }
+  if (name === 'persist') {
+    // проверка сохранения: только сообщить, что загрузилось (сцена из прошлого запуска)
+    for (let k = 0; k < 30; k++) sc.step();
+    await settle();
+    api.scenarioDone(name, { ...fieldStats(), ...sc.testInfo() });
+    return;
+  }
   if (name === 'blowfx' || name === 'clearfx' || name === 'heatfx') {
     // кадр посреди действия: частицы снегодува / фронт «очистить всё» / капли фена
     sc.fastForward(60 * 15);
@@ -616,8 +620,10 @@ async function runScenario(name: string): Promise<void> {
 }
 
 window.__test = Object.assign(window.__test ?? {}, {
-  prepare: () => {
+  prepare: (name?: string) => {
     (window.__test as unknown as { calm?: () => void }).calm?.();
+    // как сделал бы пользователь: подсказку первого запуска закрываем (кроме теста самой подсказки)
+    if (name !== 'tour' && app.settings.firstRun) api.patchSettings({ firstRun: false });
     app.scene.fastForward(600);
     // для точных замеров объёма в тестах ввода снегопад останавливаем
     app.scene.apply({ snowfall: { intensity: 0 } });
@@ -633,6 +639,12 @@ window.__test = Object.assign(window.__test ?? {}, {
   info: () => ({ ...fieldStats(), ...app.scene.testInfo() }),
   hitAt: (x: number, y: number) => hitAt(x, y)?.kind ?? null,
   overUi: (x: number, y: number) => overUi(x, y, document.elementFromPoint(x, y)),
+  simTime: () => app.scene.time,
+  running: () => running,
+  fps: () => fpsLimit(),
+  sfxAll: () => {
+    for (const n of ['crunch', 'puff', 'thud', 'splat', 'drip', 'horn', 'snowman', 'shake']) app.sfx(n, 1);
+  },
   run: (name: string) => runScenario(name),
 }) as unknown as Window['__test'];
 

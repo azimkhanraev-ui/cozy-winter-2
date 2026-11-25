@@ -6,6 +6,7 @@ import {
 } from 'electron';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import { spawn as spawnChild } from 'node:child_process';
 import { SettingsStore } from './settingsStore';
 import { snowflakeBitmap } from './icon';
 import { WinHelper } from './winhelper';
@@ -32,10 +33,14 @@ const ARGS = {
   trayCheck: flag('tray-check'),
   settingsCheck: flag('settings-check'),
   helperCheck: flag('helper-check'),
+  ledgeTest: flag('ledge-test'),
+  mouseTest: flag('mouse-test'),
+  hotkeyCheck: flag('hotkey-check'),
+  systemCheck: flag('system-check'),
   inputTest: opt('input-test'),
   seed: Number(opt('seed') ?? 0) || 0,
 };
-const TEST_MODE = !!(ARGS.scenario || ARGS.shotAfter !== null || ARGS.trayCheck || ARGS.settingsCheck || ARGS.inputTest || ARGS.helperCheck);
+const TEST_MODE = !!(ARGS.scenario || ARGS.shotAfter !== null || ARGS.trayCheck || ARGS.settingsCheck || ARGS.inputTest || ARGS.helperCheck || ARGS.ledgeTest || ARGS.mouseTest || ARGS.hotkeyCheck || ARGS.systemCheck);
 
 // ---------- профиль ----------
 const userDir = opt('user-data') ? path.resolve(opt('user-data')!) : path.join(app.getPath('appData'), 'CozyWinter2');
@@ -539,16 +544,16 @@ function updateEconomy(): void {
   if (on !== ui.economy) setUi({ economy: on });
 }
 
-const helper = new WinHelper();
+const helper = new WinHelper(userDir);
 function updateHelper(): void {
   const need = store.settings.effects.windowSnow || store.settings.system.autoPauseFullscreen;
-  if (need && (!TEST_MODE || ARGS.helperCheck)) helper.start();
+  if (need && (!TEST_MODE || ARGS.helperCheck || ARGS.ledgeTest || ARGS.systemCheck)) helper.start();
   else helper.stop();
 }
 
 helper.onState = (st) => {
   // автопауза при полноэкранном приложении/игре: оверлеи прячутся, чтобы не висеть поверх игры
-  if (store.settings.system.autoPauseFullscreen && !ARGS.helperCheck) {
+  if (store.settings.system.autoPauseFullscreen && !ARGS.helperCheck && !ARGS.ledgeTest) {
     const busy = st.fullscreen;
     if (busy !== ui.autoPaused) {
       setUi({ autoPaused: busy });
@@ -710,7 +715,8 @@ async function settingsCheck(): Promise<void> {
   const w = settingsWin!;
   const tabs: string[] = await w.webContents.executeJavaScript('Array.from(document.querySelectorAll("nav .tab")).map(b => b.dataset.id)');
   for (const id of tabs) {
-    await w.webContents.executeJavaScript(`document.querySelector('nav .tab[data-id="${id}"]').click()`);
+    const err = await w.webContents.executeJavaScript(`(() => { try { document.querySelector('nav .tab[data-id="${id}"]').click(); return document.querySelector('nav .tab.active')?.dataset.id; } catch (e) { return 'ERR ' + e.message + ' ' + e.stack; } })()`);
+    if (err !== id) console.log(`[settings-check] вкладка ${id}: ${err}`);
     await new Promise((r) => setTimeout(r, 600));
     await capture(w, `settings-${id}`);
   }
@@ -769,7 +775,8 @@ async function inputTest(name: string): Promise<void> {
   const W = s.win.getContentBounds().width;
   const H = s.win.getContentBounds().height;
   console.log(`[input-test] start ${name}`);
-  await js('window.__test.prepare()');
+  await js(`window.__test.prepare(${JSON.stringify(name)})`);
+  await wait(300);
   /** открыть док кликом по вкладке-снежинке и выбрать инструмент кликом по кнопке */
   const pick = async (tool: string) => {
     if (!(await js<boolean>('window.__test.dockOpen()'))) {
@@ -901,6 +908,58 @@ async function inputTest(name: string): Promise<void> {
       await wait(3500);
       results.snowmenAfterMelt = await js('window.__test.snowmen()');
     }
+  } else if (name === 'tour') {
+    // подсказка первого запуска: три шага кликами по кнопке
+    results.stepAtStart = await js('window.__test.tourStep()');
+    for (let k = 0; k < 3; k++) {
+      const r = await js<[number, number, number, number] | null>(`(() => { const b = document.querySelector('.tour button'); if (!b) return null; const r = b.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; })()`);
+      if (!r) break;
+      await click(Math.round(r[0] + r[2] / 2), Math.round(r[1] + r[3] / 2));
+      await wait(250);
+    }
+    await wait(500);
+    results.stepAtEnd = await js('window.__test.tourStep()');
+    results.firstRunSaved = store.settings.firstRun;
+  } else if (name === 'fx') {
+    // следы — перетаскиванием
+    await pick('steps');
+    let y = (await ground(W * 0.1)) - 5;
+    await drag(Math.round(W * 0.08), Math.round(y), Math.round(W * 0.32), Math.round(y), 40, 25);
+    // ангел — кликом
+    await pick('angel');
+    y = (await ground(W * 0.45)) + 4;
+    await click(Math.round(W * 0.45), Math.round(y));
+    // снежок: оттянуть и отпустить
+    await pick('throw');
+    results.toolAtThrow = ui.tool;
+    results.interactiveAtThrow = ui.interactive;
+    await drag(Math.round(W * 0.6), Math.round(H * 0.55), Math.round(W * 0.52), Math.round(H * 0.7), 15, 20);
+    // ждём, пока снежок долетит (на загруженной машине кадров меньше — фиксированной паузы мало)
+    for (let k = 0; k < 50; k++) {
+      await wait(200);
+      const inf = await js<{ projectiles: number; splats: number }>('window.__test.info()');
+      if (inf.projectiles === 0 && k > 3) break;
+    }
+    results.afterThrow = await js('window.__test.info()');
+    // кнопки дока: камера, «зима за минуту», встряхнуть
+    await click(...center('camera'));
+    await wait(1500);
+    await click(...center('winter'));
+    await wait(400);
+    results.winterOn = ui.winterUntil > Date.now();
+    const t0 = await js<number>('window.__test.simTime()');
+    await wait(2000);
+    results.simSpeed = +(((await js<number>('window.__test.simTime()')) - t0) / 2).toFixed(1);
+    await click(...center('winter'));
+    await click(...center('shake'));
+    await wait(700);
+    results.afterShake = await js('window.__test.info()');
+    // звук: включить и сыграть события без ошибок
+    applyPatch({ sound: { enabled: true } });
+    await wait(500);
+    await js(`window.__test.sfxAll()`);
+    results.audio = await js('window.__test.audioState()');
+    applyPatch({ sound: { enabled: false } });
   } else {
     await js(`window.__test.run(${JSON.stringify(name)})`);
   }
@@ -962,13 +1021,154 @@ app.whenReady().then(() => {
     // проверка помощника Windows API: ждём первое состояние
     const t0 = Date.now();
     const iv = setInterval(() => {
-      if (helper.last || Date.now() - t0 > 20000) {
+      if (helper.last || Date.now() - t0 > 60000) {
         clearInterval(iv);
         const st = helper.last;
-        console.log(`[helper-check] ${st ? 'PASS' : 'FAIL'} ${JSON.stringify(st ? { fullscreen: st.fullscreen, quns: st.quns, windows: st.windows.length, sample: st.windows.slice(0, 3).map((w) => ({ w: w.w, h: w.h, segs: w.top.length })) } : null)}`);
+        console.log(`[helper-check] t=${Date.now() - t0}ms ${st ? 'PASS' : 'FAIL'} ${JSON.stringify(st ? { fullscreen: st.fullscreen, quns: st.quns, windows: st.windows.length, sample: st.windows.slice(0, 3).map((w) => ({ w: w.w, h: w.h, segs: w.top.length })) } : null)}`);
         finish(st ? 0 : 1);
       }
     }, 200);
+  }
+  if (ARGS.systemCheck) {
+    // автопауза при полноэкранном окне другого процесса + режим экономии + автозапуск (в установленной версии)
+    setTimeout(async () => {
+      const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const res: Record<string, unknown> = {};
+      const ov = [...sceneWins.values()].find((x) => x.overlay);
+      const js = <R = unknown>(code: string) => ov!.win.webContents.executeJavaScript(code) as Promise<R>;
+      for (let i = 0; i < 100 && !helper.last; i++) await wait(200);
+      res.helperReady = !!helper.last;
+      const env: NodeJS.ProcessEnv = { ...process.env, FULLSCREEN: '1', CLOSE_AFTER: '9000' };
+      delete env.ELECTRON_RUN_AS_NODE;
+      const child = spawnChild(process.execPath, [path.join(ROOT, 'scripts', 'testwin.cjs')], { env, stdio: 'ignore' });
+      let paused = false;
+      for (let i = 0; i < 40 && !paused; i++) {
+        await wait(200);
+        paused = ui.autoPaused;
+      }
+      res.autoPausedWithFullscreen = paused;
+      res.overlayHidden = ov ? !ov.win.isVisible() : null;
+      res.rendererPaused = ov ? await js('window.__test.running()') === false : null;
+      await new Promise((r) => child.once('exit', r));
+      let resumed = false;
+      for (let i = 0; i < 40 && !resumed; i++) {
+        await wait(200);
+        resumed = !ui.autoPaused;
+      }
+      res.resumedAfterClose = resumed;
+      res.overlayVisibleAgain = ov ? ov.win.isVisible() : null;
+      // экономия
+      applyPatch({ system: { economy: 'on' } });
+      await wait(300);
+      res.economyFps = ov ? await js('window.__test.fps()') : null;
+      applyPatch({ system: { economy: 'off' } });
+      await wait(300);
+      res.normalFps = ov ? await js('window.__test.fps()') : null;
+      // автозапуск (HKCU\Software\Microsoft\Windows\CurrentVersion\Run) — только в установленной версии; сразу возвращаем как было
+      if (app.isPackaged) {
+        const was = app.getLoginItemSettings().openAtLogin;
+        applyPatch({ system: { autostart: true } });
+        res.autostartOn = app.getLoginItemSettings({ path: process.env.PORTABLE_EXECUTABLE_FILE || process.execPath }).openAtLogin;
+        applyPatch({ system: { autostart: false } });
+        res.autostartOff = !app.getLoginItemSettings({ path: process.env.PORTABLE_EXECUTABLE_FILE || process.execPath }).openAtLogin;
+        if (was) app.setLoginItemSettings({ openAtLogin: true });
+      } else res.autostart = 'dev: проверяется в собранной версии';
+      console.log(`[system-check] ${JSON.stringify(res)}`);
+      finish(0);
+    }, 1500);
+  }
+  if (ARGS.hotkeyCheck) {
+    // регистрация глобальных клавиш (сами клавиши не нажимаем — они ушли бы в чужое активное окно)
+    setTimeout(() => {
+      registerHotkeys();
+      const ok1 = { ...hotkeyOk };
+      // смена сочетания из настроек перерегистрирует клавишу
+      applyPatch({ hotkeys: { shake: 'Ctrl+Alt+F9' } });
+      registerHotkeys(); // в обычном режиме это делает applyPatch, в тестовом он клавиши не трогает
+      const ok2 = { ...hotkeyOk, registered: Object.values(registeredHot) };
+      console.log(`[hotkey-check] ${JSON.stringify({ defaults: ok1, afterChange: ok2 })}`);
+      globalShortcut.unregisterAll();
+      finish(0);
+    }, 1500);
+  }
+  if (ARGS.mouseTest) {
+    // Кто получает клик: оверлей (pid этого процесса) или то, что под ним. Зонд — маленький exe (csc).
+    setTimeout(async () => {
+      const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const win = process.env.WINDIR || 'C:\Windows';
+      const csc = path.join(win, 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe');
+      const probeExe = path.join(userDir, 'probe.exe');
+      const { execFileSync } = await import('node:child_process');
+      execFileSync(csc, ['-nologo', `-out:${probeExe}`, path.join(ROOT, 'scripts', 'probe.cs')], { windowsHide: true });
+      const ov = [...sceneWins.values()].find((x) => x.overlay)!;
+      const b = ov.win.getBounds();
+      const d = screen.getDisplayMatching(b);
+      const phys = (x: number, y: number) => screen.dipToScreenPoint({ x: b.x + x, y: b.y + y });
+      const owner = (x: number, y: number) => {
+        const p = phys(x, y);
+        const out = execFileSync(probeExe, [String(Math.round(p.x)), String(Math.round(p.y))], { encoding: 'utf8', windowsHide: true });
+        return Number(out.trim().split(' ')[1]) === process.pid ? 'overlay' : 'under';
+      };
+      const center: [number, number] = [Math.round(b.width / 2), Math.round(b.height / 3)];
+      const res: Record<string, string> = {};
+      await wait(2500);
+      res.passive = owner(...center);
+      setUi({ interactive: true, tool: 'shovel' });
+      await wait(600);
+      res.interactive = owner(...center);
+      setUi({ interactive: false });
+      await wait(600);
+      res.afterEsc = owner(...center);
+      // курсор над вкладкой дока (события мыши пересылаются даже в пассивном режиме)
+      // док после режима инструментов ещё открыт — ждём автоскрытия, чтобы осталась одна вкладка-снежинка
+      const js = <R = unknown>(code: string) => ov.win.webContents.executeJavaScript(code) as Promise<R>;
+      for (let i = 0; i < 60 && (await js<boolean>('window.__test.dockOpen()')); i++) await wait(100);
+      await wait(500);
+      const t = lastRects.tab;
+      if (t) {
+        const tx = Math.round(t[0] + t[2] / 2);
+        const ty = Math.round(t[1] + t[3] / 2);
+        let got = 'under';
+        for (let i = 0; i < 15 && got !== 'overlay'; i++) {
+          ov.win.webContents.sendInputEvent({ type: 'mouseMove', x: tx + (i % 2), y: ty });
+          await wait(200);
+          got = owner(tx, ty);
+        }
+        res.overDockTab = got;
+        let away = 'overlay';
+        for (let i = 0; i < 15 && away !== 'under'; i++) {
+          ov.win.webContents.sendInputEvent({ type: 'mouseMove', x: center[0] + (i % 2), y: center[1] });
+          await wait(200);
+          away = owner(...center);
+        }
+        res.awayFromDock = away;
+      }
+      console.log(`[mouse-test] ${JSON.stringify(res)} scale=${d.scaleFactor}`);
+      finish(0);
+    }, 1500);
+  }
+  if (ARGS.ledgeTest) {
+    // Снег на краях настоящего окна: обычное окно поверх всех, снег копится на его верхней кромке,
+    // потом окно сдвигаем — снег должен осыпаться.
+    setTimeout(async () => {
+      const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      // окно другого процесса (свои окна помощник намеренно пропускает)
+      const env: NodeJS.ProcessEnv = { ...process.env, MOVE_AFTER: '28000' };
+      delete env.ELECTRON_RUN_AS_NODE;
+      const child = spawnChild(process.execPath, [path.join(ROOT, 'scripts', 'testwin.cjs')], { env, stdio: 'ignore' });
+      const ov = [...sceneWins.values()].find((x) => x.overlay)!;
+      await wait(2500);
+      await ov.win.webContents.executeJavaScript('window.__test.boostSnow()');
+      await wait(24000);
+      const before = await ov.win.webContents.executeJavaScript('window.__test.info()');
+      await captureDesktop('ledges-before');
+      await wait(4500); // окно сдвигается на 28-й секунде
+      const after = await ov.win.webContents.executeJavaScript('window.__test.info()');
+      await captureDesktop('ledges-after');
+      console.log(`[ledge-test] before=${JSON.stringify({ ledges: before.ledges, snow: before.ledgeSnow })} after=${JSON.stringify({ ledges: after.ledges, snow: after.ledgeSnow })}`);
+      child.kill();
+      finish(0);
+    }, 2000);
   }
   if (ARGS.inputTest)
     setTimeout(async () => {

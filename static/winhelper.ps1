@@ -3,9 +3,9 @@
 #   fullscreen — запущено полноэкранное приложение/игра/презентация (SHQueryUserNotificationState + проверка активного окна)
 #   windows    — видимые окна верхнего уровня (физические пиксели) и не перекрытые отрезки их верхних кромок
 # Завершается сам, когда умирает родительский процесс.
-param([int]$ParentPid = 0, [int]$IntervalMs = 500)
+param([int]$ParentPid = 0, [int]$IntervalMs = 500, [string]$Cache = '')
 $ErrorActionPreference = 'Stop'
-Add-Type -TypeDefinition @"
+$code = @"
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -116,6 +116,14 @@ public static class CozyWin {
   }
 }
 "@
+# Компиляция C# занимает до ~20 с, поэтому сборка кэшируется в DLL (имя содержит версию кода).
+if ($Cache -and (Test-Path -LiteralPath $Cache)) {
+  try { Add-Type -Path $Cache } catch { Add-Type -TypeDefinition $code }
+} elseif ($Cache) {
+  try { Add-Type -TypeDefinition $code -OutputAssembly $Cache; Add-Type -Path $Cache } catch { Add-Type -TypeDefinition $code }
+} else {
+  Add-Type -TypeDefinition $code
+}
 [CozyWin]::InitDpi()
 [Console]::Out.WriteLine('{"ready":true}')
 [Console]::Out.Flush()

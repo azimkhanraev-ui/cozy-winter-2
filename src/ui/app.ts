@@ -75,6 +75,9 @@ export interface OverlayModule {
   scenario?(name: string, app: App): Promise<unknown> | null;
 }
 
+/** Звук: модуль звука подменяет play; остальные зовут app.sfx(). */
+export const audioHooks = { play: (_name: string, _power: number): void => {} };
+
 export const overlayModules: OverlayModule[] = [];
 export function registerModule(m: OverlayModule): void {
   overlayModules.push(m);
