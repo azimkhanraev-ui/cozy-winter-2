@@ -43,6 +43,7 @@ const S = {
   customize: ['Снеговик', 'Snowman'],
   name: ['Имя', 'Name'],
   hat: ['Шапка', 'Hat'],
+  hatColor: ['Цвет шапки', 'Hat colour'],
   scarf: ['Шарф', 'Scarf'],
   nose: ['Нос', 'Nose'],
   broom: ['Метла', 'Broom'],

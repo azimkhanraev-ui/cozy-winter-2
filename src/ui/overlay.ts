@@ -630,6 +630,8 @@ window.__test = Object.assign(window.__test ?? {}, {
   setTool: (tool: ToolId) => api.ui({ interactive: true, tool }),
   setBallSize: (r: number) => api.patchSettings({ tools: { ballSize: r } }),
   info: () => ({ ...fieldStats(), ...app.scene.testInfo() }),
+  hitAt: (x: number, y: number) => hitAt(x, y)?.kind ?? null,
+  overUi: (x: number, y: number) => overUi(x, y, document.elementFromPoint(x, y)),
   run: (name: string) => runScenario(name),
 }) as unknown as Window['__test'];
 

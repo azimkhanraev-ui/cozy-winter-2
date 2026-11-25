@@ -101,6 +101,24 @@ const tail = (s) => s.out.slice(-500).replace(/\s+/g, ' ');
   check('мышью: шары S/M/L/XL, бросок, «Катать», ПКМ растапливает', ok, i ? `радиусы ${JSON.stringify(sizes)}, шаров до/после ПКМ ${i.ballsBeforeMelt}/${i.balls} → ${s.shot}` : tail(s));
 }
 
+// ---------- этап 5: снеговик ----------
+{
+  const s = scenario('snowman');
+  const i = s.info;
+  check('правильная стопка → 1 снеговик, неправильная → подсказка', !!i && i.snowmen === 1 && i.hint === 'order', i ? `снеговиков ${i.snowmen}, подсказка «${i.hint}» → ${s.shot}` : tail(s));
+}
+{
+  const s = scenario('snowmen');
+  const i = s.info;
+  const uniq = new Set(i?.looks ?? []).size;
+  check('разные снеговики: малыш…великан, разная внешность', !!i && i.snowmen >= 4 && uniq >= 3, i ? `снеговиков ${i.snowmen}, внешностей ${uniq}: ${i.looks.join(', ')} → ${s.shot}` : tail(s));
+}
+{
+  const s = inputTest('snowman');
+  const i = s.info;
+  check('мышью: собрать из 3 шаров, двойной клик → окошко, перетащить, ПКМ → растаял', !!i && i.customizeOpen === true && Math.abs(i.dragDx ?? 0) > 100 && i.snowmenAfterMelt === 0, i ? JSON.stringify({ customize: i.customizeOpen, dragDx: i.dragDx, afterMelt: i.snowmenAfterMelt }) : tail(s));
+}
+
 rmSync(PROFILE, { recursive: true, force: true });
 const ok = results.every(Boolean);
 console.log(`\n${ok ? 'ALL PASS' : 'SOME FAILED'} (${results.filter(Boolean).length}/${results.length})`);

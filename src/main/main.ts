@@ -627,6 +627,13 @@ ipcMain.on('mouse-capture', (e, capture: boolean) => {
   s.hoverCapture = capture;
   applyMouseMode();
 });
+ipcMain.on('set-focus', (e, focus: boolean) => {
+  const s = entryFor(e.sender);
+  if (!s || !s.overlay) return;
+  s.win.setFocusable(focus);
+  if (focus) s.win.focus();
+  else s.win.blur();
+});
 ipcMain.on('settings:export', async () => {
   const r = await dialog.showSaveDialog({ title: T('Экспорт настроек', 'Export settings'), defaultPath: 'cozy-winter-settings.json', filters: [{ name: 'JSON', extensions: ['json'] }] });
   if (!r.canceled && r.filePath) fs.writeFileSync(r.filePath, JSON.stringify(store.settings, null, 2));
@@ -847,24 +854,52 @@ async function inputTest(name: string): Promise<void> {
     Object.assign(results, await js('window.__test.info()'));
   } else if (name === 'snowman') {
     // собрать снеговика руками: три шара мышью, ставим друг на друга
-    const x = Math.round(W * 0.5);
-    await pick('ball');
+    // ровное место для стопки
+    let x = Math.round(W * 0.5);
+    let bestV = Infinity;
+    for (let xx = Math.round(W * 0.25); xx < W * 0.75; xx += 10) {
+      const v = Math.abs((await ground(xx - 60)) - (await ground(xx))) + Math.abs((await ground(xx + 60)) - (await ground(xx)));
+      if (v < bestV) {
+        bestV = v;
+        x = xx;
+      }
+    }
+    await pick('ballXL');
     await js('window.__test.setBallSize(48)');
     await click(x, Math.round(H * 0.4));
     await wait(2500);
+    // целимся туда, где шар реально лёг (он мог чуть откатиться)
+    const p0 = await js<[number, number]>('window.__test.ballPos(0)');
     await js('window.__test.setBallSize(34)');
-    await click(x + 6, Math.round(H * 0.2));
+    await click(Math.round(p0[0]) + 4, Math.round(H * 0.2));
     await wait(2500);
+    const p1 = await js<[number, number]>('window.__test.ballPos(1)');
     await js('window.__test.setBallSize(24)');
-    await click(x + 3, Math.round(H * 0.05));
+    await click(Math.round(p1[0]) + 2, Math.round(H * 0.05));
     await wait(3500);
     const sm = await js<[number, number] | null>('window.__test.snowmanPos(0)');
     results.snowmen = await js('window.__test.snowmen()');
     if (sm) {
       // двойной клик открывает окно кастомизации
       await js('window.__test.setTool("hand")');
+      await wait(300);
+      results.hitBefore = await js(`window.__test.hitAt(${Math.round(sm[0])}, ${Math.round(sm[1])})`);
+      results.overUi = await js(`window.__test.overUi(${Math.round(sm[0])}, ${Math.round(sm[1])})`);
       await dblclick(Math.round(sm[0]), Math.round(sm[1]));
       results.customizeOpen = await js('window.__test.customizeOpen()');
+      await capture(s.win, 'input-snowman-customize');
+      // закрыть окошко «Готово», перетащить снеговика, затем растопить ПКМ
+      await js(`document.querySelector('.popup [data-a="done"]').click()`);
+      await wait(300);
+      const x0 = Math.round(sm[0]);
+      const x1 = x0 + (x0 < W / 2 ? 180 : -180);
+      await drag(x0, Math.round(sm[1]), x1, Math.round(sm[1]), 20, 20);
+      await wait(800);
+      const moved = await js<[number, number] | null>('window.__test.snowmanPos(0)');
+      results.dragDx = moved ? Math.round(moved[0] - sm[0]) : null;
+      await click(Math.round(moved![0]), Math.round(moved![1]), 'right');
+      await wait(3500);
+      results.snowmenAfterMelt = await js('window.__test.snowmen()');
     }
   } else {
     await js(`window.__test.run(${JSON.stringify(name)})`);

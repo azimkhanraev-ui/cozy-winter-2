@@ -1,2 +1,3 @@
 // Подключение модулей сцены (каждый регистрирует себя в app.ts / tools.ts при импорте).
 import './mod-balls';
+import './mod-snowmen';

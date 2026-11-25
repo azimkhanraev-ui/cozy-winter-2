@@ -388,18 +388,19 @@ export class BallWorld implements SceneModule {
       contacts = this.buildContacts();
       this.correct(contacts);
     }
-    // на чём лежит каждый шар (для снеговиков)
-    for (const b of this.balls) b.restsOn = -1;
+    // на чём лежит каждый шар (для снеговиков). У спящих контакты не строятся — они помнят опору.
+    for (const b of this.balls) if (!b.sleeping) b.restsOn = -1;
     for (const c of contacts) {
+      if (c.a.sleeping) continue;
       if (c.ny > -0.55) continue; // опора должна быть снизу
       if (c.ground) c.a.restsOn = 0;
       else if (c.b && c.a.restsOn !== 0) c.a.restsOn = c.b.id;
       else if (!c.b && c.a.restsOn === -1) c.a.restsOn = -2; // статика
     }
     for (const c of contacts) {
-      if (!c.b) continue;
-      // b тоже может лежать на a
-      if (-c.ny < -0.55 && c.b.restsOn !== 0) c.b.restsOn = c.a.id;
+      if (!c.b || c.b.sleeping) continue;
+      // b тоже может лежать на a (нормаль контакта направлена от b к a)
+      if (c.ny > 0.55 && c.b.restsOn !== 0) c.b.restsOn = c.a.id;
     }
   }
 

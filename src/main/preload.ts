@@ -20,5 +20,6 @@ const api: CozyApi = {
   importSettings: () => ipcRenderer.send('settings:import'),
   hotkeyStatus: () => ipcRenderer.invoke('hotkey-status'),
   reportRects: (r) => ipcRenderer.send('rects', r),
+  setFocus: (f) => ipcRenderer.send('set-focus', f),
 };
 contextBridge.exposeInMainWorld('cozy', api);

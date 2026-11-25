@@ -78,6 +78,8 @@ export interface CozyApi {
   exportSettings(): void;
   importSettings(): void;
   hotkeyStatus(): Promise<Record<string, boolean>>;
+  /** Временно сделать окно оверлея фокусируемым (ввод текста в окошке снеговика). */
+  setFocus(focus: boolean): void;
   /** Для тестов: прямоугольники элементов дока (имя → x,y,w,h). */
   reportRects(rects: Record<string, [number, number, number, number]>): void;
 }
