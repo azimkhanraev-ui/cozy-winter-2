@@ -10,6 +10,7 @@ import { spawn as spawnChild, execFileSync } from 'node:child_process';
 import { SettingsStore } from './settingsStore';
 import { snowflakeBitmap } from './icon';
 import { WinHelper } from './winhelper';
+import { Wallpaper } from './wallpaper';
 import type { InitInfo, Command, UiState, WinRect } from '../shared/ipc';
 import { Settings, ToolId, sanitizeSettings } from '../shared/settings';
 
@@ -662,6 +663,30 @@ ipcMain.on('set-focus', (e, focus: boolean) => {
   if (focus) s.win.focus();
   else s.win.blur();
 });
+// ---------- зимние обои ----------
+const wallpaper = new Wallpaper(userDir, STATIC);
+ipcMain.handle('wallpaper:apply', async (_e, scene: string, png: Uint8Array) => {
+  try {
+    let original = store.settings.wallpaper.original;
+    if (!original || !fs.existsSync(original)) {
+      original = wallpaper.backupOriginal();
+      if (original) applyPatch({ wallpaper: { original } });
+    }
+    const file = await wallpaper.apply(scene, Buffer.from(png));
+    if (!file) return { ok: false, error: 'не удалось установить обои' };
+    applyPatch({ wallpaper: { scene } });
+    console.log(`[wallpaper] ${scene} → ${file}`);
+    return { ok: true, file };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+ipcMain.handle('wallpaper:restore', async () => {
+  const ok = await wallpaper.restore(store.settings.wallpaper.original);
+  applyPatch({ wallpaper: { scene: 'none' } });
+  return { ok, original: store.settings.wallpaper.original };
+});
+
 ipcMain.on('settings:export', async () => {
   const r = await dialog.showSaveDialog({ title: T('Экспорт настроек', 'Export settings'), defaultPath: 'cozy-winter-settings.json', filters: [{ name: 'JSON', extensions: ['json'] }] });
   if (!r.canceled && r.filePath) fs.writeFileSync(r.filePath, JSON.stringify(store.settings, null, 2));
@@ -931,6 +956,27 @@ async function inputTest(name: string): Promise<void> {
       await wait(3500);
       results.snowmenAfterMelt = await js('window.__test.snowmen()');
     }
+  } else if (name === 'hand') {
+    // без режима инструментов: навести на сугроб и провести мышью — снег сгребается рукой
+    results.interactiveBefore = ui.interactive;
+    const x0 = Math.round(W * 0.3);
+    const x1 = Math.round(W * 0.6);
+    let y = 0;
+    for (let x = x0; x <= x1; x += 20) y = Math.max(y, await ground(x));
+    y = Math.round(y + 12);
+    const strip = async () => js<number>(`(() => { const f = window.__test.field(); let s = 0; for (let x = ${x0 + 60}; x < ${x1 - 60}; x += 2) s += f.snow[f.col(x)]; return s; })()`);
+    const v0 = await js<number>('window.__test.volume()');
+    const s0 = await strip();
+    move(x0, y);
+    await wait(300);
+    results.hoverHit = await js(`window.__test.hitAt(${x0}, ${y})`);
+    await drag(x0, y, x1, y, 40, 25);
+    await wait(500);
+    const s1 = await strip();
+    results.stripBefore = Math.round(s0);
+    results.stripAfter = Math.round(s1);
+    results.volumeDelta = +((await js<number>('window.__test.volume()')) / v0 - 1).toFixed(4);
+    results.interactiveAfter = ui.interactive;
   } else if (name === 'tour') {
     // подсказка первого запуска: три шага кликами по кнопке
     results.stepAtStart = await js('window.__test.tourStep()');

@@ -61,3 +61,15 @@ describe('настройки этапов 3–9', () => {
     }
   });
 });
+
+describe('настройки 1.1', () => {
+  it('гирлянда, обои и уборка рукой: значения по умолчанию и проверка', () => {
+    expect(DEFAULT_SETTINGS.tools.handSweep).toBe(true);
+    expect(DEFAULT_SETTINGS.topGarland.enabled).toBe(true);
+    expect(DEFAULT_SETTINGS.wallpaper.scene).toBe('none');
+    const s = sanitizeSettings({ topGarland: { style: 'disco', brightness: 900 }, wallpaper: { scene: 'beach' } });
+    expect(s.topGarland.style).toBe('multi');
+    expect(s.topGarland.brightness).toBe(100);
+    expect(s.wallpaper.scene).toBe('none');
+  });
+});

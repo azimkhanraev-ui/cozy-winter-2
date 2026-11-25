@@ -42,6 +42,14 @@
   .phases { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
   .ph { background: var(--panel); color: var(--mute); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; cursor: pointer; }
   .ph.active { color: var(--text); border-color: var(--acc); }
+  .wp { padding: 4px 0 6px; }
+  .wp-title { margin-bottom: 8px; }
+  .wp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .wp-item { background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 4px; cursor: pointer; color: var(--text); font: inherit; font-size: 12px; display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+  .wp-item canvas { width: 100%; height: auto; border-radius: 6px; display: block; }
+  .wp-item.active, .wp-item:hover { border-color: var(--acc); }
+  .wp-status { margin-top: 6px; color: var(--acc); min-height: 18px; font-size: 13px; }
+  .wp-note { color: var(--mute); font-size: 12px; margin: 4px 0 0; }
 </style>
 </head>
 <body>

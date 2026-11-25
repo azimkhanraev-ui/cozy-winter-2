@@ -223,6 +223,14 @@ const tail = (s) => s.out.slice(-500).replace(/\s+/g, ' ');
   check('автопауза при полноэкранном окне, режим экономии', ok, i ? JSON.stringify(i) : r.out.slice(-300));
 }
 
+// ---------- 1.1: снег рукой, гирлянда, обои ----------
+{
+  const s = inputTest('hand');
+  const i = s.info;
+  const ok = !!i && i.interactiveBefore === false && i.hoverHit === 'snow' && i.stripAfter < i.stripBefore * 0.3 && Math.abs(i.volumeDelta) < 0.01 && i.interactiveAfter === false;
+  check('снег рукой без инструментов: навести и провести', ok, i ? `режим инструментов: ${i.interactiveBefore}, под курсором: ${i.hoverHit}, снег в полосе ${i.stripBefore} → ${i.stripAfter}, Δобъёма ${(i.volumeDelta * 100).toFixed(2)}% → ${s.shot}` : tail(s));
+}
+
 rmSync(PROFILE, { recursive: true, force: true });
 const ok = results.every(Boolean);
 console.log(`\n${ok ? 'ALL PASS' : 'SOME FAILED'} (${results.filter(Boolean).length}/${results.length})`);

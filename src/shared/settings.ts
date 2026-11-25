@@ -21,6 +21,9 @@ export interface DayPreset {
   aurora: number;
 }
 
+export type WallpaperScene = 'none' | 'mountains' | 'forest' | 'village' | 'aurora';
+export const WALLPAPERS: WallpaperScene[] = ['none', 'mountains', 'forest', 'village', 'aurora'];
+
 export type ToolId =
   | 'hand' | 'shovel' | 'eraser' | 'blower' | 'heat' | 'add'
   | 'ball' | 'roll' | 'steps' | 'angel' | 'tree' | 'throw' | 'drive';
@@ -69,6 +72,8 @@ export interface Settings {
     ballSize: number;
     /** Сила инструментов (снегодув/тепло/насыпать) 10..200 %. */
     strength: number;
+    /** Без режима инструментов: навести на сугроб и тянуть — снег сгребается рукой. */
+    handSweep: boolean;
   };
   balls: {
     capSnow: boolean;
@@ -111,6 +116,19 @@ export interface Settings {
   effects: {
     splats: boolean;
     windowSnow: boolean;
+  };
+  /** Гирлянда вдоль верхнего края экрана. */
+  topGarland: {
+    enabled: boolean;
+    style: 'multi' | 'warm' | 'cold' | 'candy';
+    mode: 'twinkle' | 'chase' | 'steady';
+    brightness: number;
+  };
+  /** Зимние обои рабочего стола (рисуются кодом). */
+  wallpaper: {
+    scene: WallpaperScene;
+    /** Обои пользователя до первой замены — чтобы вернуть. */
+    original: string;
   };
   sound: {
     enabled: boolean;
@@ -161,13 +179,15 @@ export const DEFAULT_SETTINGS: Settings = {
   firstRun: true,
   snow: { intensity: 45, wind: 18, gusts: 45, flakeSize: 100, layers: 4, soft: true, crystal: true, fluffy: true, glitter: true },
   drift: { unevenness: 70, maxHeight: 90, accumulation: 100, melt: 0, windTransport: 50, repose: 36 },
-  tools: { current: 'shovel', size: 50, softness: 40, ballSize: 26, strength: 100 },
+  tools: { current: 'shovel', size: 50, softness: 40, ballSize: 26, strength: 100, handSweep: true },
   balls: { capSnow: true, max: 40 },
   snowmen: { limit: 12, speech: true, blink: true, wave: true },
   plow: { enabled: true, speed: 55, size: 100, color: '#f4c430', count: 1, interval: 480, direction: 'alternate' },
   day: { mode: 'auto', phase: 'day', hour: 12, skyOpacity: 0, celestial: 60, presets: structuredClone(DEFAULT_PRESETS) },
   decor: { enabled: true, scale: 100, house: true, trees: true, garland: true, lantern: true, fence: true },
   effects: { splats: true, windowSnow: false },
+  topGarland: { enabled: true, style: 'multi', mode: 'twinkle', brightness: 80 },
+  wallpaper: { scene: 'none', original: '' },
   sound: { enabled: false, master: 70, wind: 50, effects: 70, motor: 50 },
   hotkeys: { toggle: 'Ctrl+Alt+S', pause: 'Ctrl+Alt+P', clear: 'Ctrl+Alt+C', shake: 'Ctrl+Alt+G', quit: 'Ctrl+Alt+Q' },
   dock: { autohide: true, x: 0, y: 0 },
@@ -207,6 +227,7 @@ const RANGES: Record<string, Range> = {
   'sound.motor': [0, 100],
   'dock.x': [-4000, 4000],
   'dock.y': [-2000, 0],
+  'topGarland.brightness': [10, 100],
 };
 const ENUMS: Record<string, readonly unknown[]> = {
   lang: ['ru', 'en'],
@@ -220,6 +241,9 @@ const ENUMS: Record<string, readonly unknown[]> = {
   'day.mode': ['auto', 'manual', 'slider', 'demo'],
   'day.phase': PHASES,
   'system.economy': ['off', 'auto', 'on'],
+  'topGarland.style': ['multi', 'warm', 'cold', 'candy'],
+  'topGarland.mode': ['twinkle', 'chase', 'steady'],
+  'wallpaper.scene': WALLPAPERS,
 };
 
 function isObj(v: unknown): v is Record<string, unknown> {

@@ -21,5 +21,7 @@ const api: CozyApi = {
   hotkeyStatus: () => ipcRenderer.invoke('hotkey-status'),
   reportRects: (r) => ipcRenderer.send('rects', r),
   setFocus: (f) => ipcRenderer.send('set-focus', f),
+  setWallpaper: (scene, png) => ipcRenderer.invoke('wallpaper:apply', scene, png),
+  restoreWallpaper: () => ipcRenderer.invoke('wallpaper:restore'),
 };
 contextBridge.exposeInMainWorld('cozy', api);

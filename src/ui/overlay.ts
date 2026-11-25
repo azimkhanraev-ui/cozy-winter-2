@@ -639,6 +639,7 @@ window.__test = Object.assign(window.__test ?? {}, {
   info: () => ({ ...fieldStats(), ...app.scene.testInfo() }),
   hitAt: (x: number, y: number) => hitAt(x, y)?.kind ?? null,
   overUi: (x: number, y: number) => overUi(x, y, document.elementFromPoint(x, y)),
+  field: () => app.scene.field,
   simTime: () => app.scene.time,
   running: () => running,
   fps: () => fpsLimit(),

@@ -78,6 +78,9 @@ export interface CozyApi {
   exportSettings(): void;
   importSettings(): void;
   hotkeyStatus(): Promise<Record<string, boolean>>;
+  /** Поставить нарисованные зимние обои (PNG) / вернуть обои пользователя. */
+  setWallpaper(scene: string, png: Uint8Array): Promise<{ ok: boolean; error?: string; file?: string }>;
+  restoreWallpaper(): Promise<{ ok: boolean; original: string }>;
   /** Временно сделать окно оверлея фокусируемым (ввод текста в окошке снеговика). */
   setFocus(focus: boolean): void;
   /** Для тестов: прямоугольники элементов дока (имя → x,y,w,h). */

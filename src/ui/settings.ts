@@ -7,6 +7,8 @@ import { lightAt, hourFor } from '../sim/daytime';
 import { GroundRenderer } from '../render/ground';
 import { SnowRenderer } from '../render/snow';
 import { sceneParamsFrom } from './mapSettings';
+import { drawWallpaper, WALLPAPER_NAMES } from '../render/wallpaper';
+import { WALLPAPERS, WallpaperScene } from '../shared/settings';
 
 declare global {
   interface Window {
@@ -23,7 +25,8 @@ type Ctl =
   | { kind: 'hotkey'; path: string; label: L }
   | { kind: 'button'; label: L; run: () => void }
   | { kind: 'note'; label: L }
-  | { kind: 'presetEditor' };
+  | { kind: 'presetEditor' }
+  | { kind: 'wallpapers' };
 
 interface Section {
   id: string;
@@ -91,6 +94,7 @@ const SECTIONS: Section[] = [
       { kind: 'slider', path: 'tools.strength', label: ['Сила снегодува/фена/насыпания', 'Blower/heat/add strength'], min: 10, max: 200, unit: '%' },
       { kind: 'slider', path: 'tools.ballSize', label: ['Радиус шара', 'Ball radius'], min: 8, max: 90, unit: ' px' },
       { kind: 'slider', path: 'balls.max', label: ['Максимум шаров', 'Max balls'], min: 1, max: 100 },
+      { kind: 'check', path: 'tools.handSweep', label: ['Убирать снег рукой без инструментов (навести на сугроб и тянуть)', 'Sweep snow by hand without tools (hover a drift and drag)'] },
       { kind: 'check', path: 'balls.capSnow', label: ['Снег копится на шарах', 'Snow caps on balls'] },
       { kind: 'check', path: 'dock.autohide', label: ['Автоскрытие дока', 'Auto-hide dock'] },
       { kind: 'button', label: ['Вернуть док на место', 'Reset dock position'], run: () => api.patchSettings({ dock: { x: 0, y: 0 } }) },
@@ -124,8 +128,13 @@ const SECTIONS: Section[] = [
   {
     id: 'scene',
     title: ['Сцена и декор', 'Scene & decor'],
-    resets: ['decor', 'plow', 'effects', 'sound'],
+    resets: ['decor', 'plow', 'effects', 'sound', 'topGarland'],
     controls: [
+      { kind: 'wallpapers' },
+      { kind: 'check', path: 'topGarland.enabled', label: ['Гирлянда вдоль верхнего края экрана', 'Garland along the top of the screen'] },
+      { kind: 'select', path: 'topGarland.style', label: ['Цвета гирлянды', 'Garland colours'], options: [['multi', 'Разноцветная', 'Multicolour'], ['warm', 'Тёплая белая', 'Warm white'], ['cold', 'Холодная голубая', 'Cool blue'], ['candy', 'Красно-белая', 'Red & white']] },
+      { kind: 'select', path: 'topGarland.mode', label: ['Режим огней', 'Light mode'], options: [['twinkle', 'Мерцание', 'Twinkle'], ['chase', 'Бегущие огни', 'Chase'], ['steady', 'Ровный свет', 'Steady']] },
+      { kind: 'slider', path: 'topGarland.brightness', label: ['Яркость гирлянды', 'Garland brightness'], min: 10, max: 100, unit: '%' },
       { kind: 'check', path: 'decor.enabled', label: ['Декор', 'Decor'] },
       { kind: 'slider', path: 'decor.scale', label: ['Масштаб декора', 'Decor scale'], min: 50, max: 200, unit: '%' },
       { kind: 'check', path: 'decor.house', label: ['Домик', 'House'] },
@@ -315,8 +324,73 @@ function row(c: Ctl): HTMLElement {
     row.innerHTML = `<p>${tr(c.label)}</p>`;
   } else if (c.kind === 'presetEditor') {
     row.appendChild(presetEditor());
+  } else if (c.kind === 'wallpapers') {
+    row.appendChild(wallpapers());
   }
   return row;
+}
+
+/** Галерея зимних обоев рабочего стола: миниатюры рисуются тем же кодом, что и сами обои. */
+function wallpapers(): HTMLElement {
+  const box = document.createElement('div');
+  box.className = 'wp';
+  box.innerHTML = `<div class="wp-title">${tr(['Зимние обои рабочего стола', 'Winter desktop wallpaper'])}</div>`;
+  const grid = document.createElement('div');
+  grid.className = 'wp-grid';
+  const status = document.createElement('div');
+  status.className = 'wp-status';
+  const cur = settings.wallpaper.scene;
+  for (const sc of WALLPAPERS) {
+    const b = document.createElement('button');
+    b.className = 'wp-item' + (sc === cur ? ' active' : '');
+    b.dataset.wallpaper = sc;
+    const cv = document.createElement('canvas');
+    cv.width = 160;
+    cv.height = 90;
+    const g = cv.getContext('2d')!;
+    if (sc === 'none') {
+      g.fillStyle = '#24324d';
+      g.fillRect(0, 0, 160, 90);
+      g.fillStyle = '#9db0cf';
+      g.font = '28px Segoe UI';
+      g.textAlign = 'center';
+      g.fillText('↺', 80, 56);
+    } else drawWallpaper(g, 160, 90, sc);
+    const cap = document.createElement('span');
+    cap.textContent = tr(WALLPAPER_NAMES[sc]);
+    b.append(cv, cap);
+    b.onclick = () => applyWallpaper(sc, status);
+    grid.appendChild(b);
+  }
+  box.append(grid, status);
+  const note = document.createElement('p');
+  note.className = 'wp-note';
+  note.textContent = tr(['«Мои обои» возвращают картинку, которая стояла до первой замены. Если у вас было «Windows: интересное», вернётся последняя картинка из него — сам режим включается снова в Параметрах Windows.', '“My wallpaper” restores the picture you had before. If you used Windows Spotlight, its last picture comes back — re-enable Spotlight itself in Windows Settings.']);
+  box.appendChild(note);
+  return box;
+}
+
+async function applyWallpaper(sc: WallpaperScene, status: HTMLElement): Promise<void> {
+  status.textContent = tr(['Рисую обои…', 'Painting the wallpaper…']);
+  try {
+    if (sc === 'none') {
+      const r = await api.restoreWallpaper();
+      status.textContent = r.ok ? tr(['Ваши обои возвращены', 'Your wallpaper is back']) : tr(['Нечего возвращать — обои не менялись', 'Nothing to restore — wallpaper was not changed']);
+      return;
+    }
+    // в разрешении экрана (физические пиксели)
+    const W = Math.round(window.screen.width * (window.devicePixelRatio || 1));
+    const H = Math.round(window.screen.height * (window.devicePixelRatio || 1));
+    const cv = document.createElement('canvas');
+    cv.width = W;
+    cv.height = H;
+    drawWallpaper(cv.getContext('2d')!, W, H, sc);
+    const blob: Blob = await new Promise((res) => cv.toBlob((b) => res(b!), 'image/png'));
+    const r = await api.setWallpaper(sc, new Uint8Array(await blob.arrayBuffer()));
+    status.textContent = r.ok ? tr(['Обои установлены', 'Wallpaper set']) + ` (${W}×${H})` : tr(['Не получилось: ', 'Failed: ']) + (r.error ?? '');
+  } catch (e) {
+    status.textContent = String(e);
+  }
 }
 
 /** Редактор пресета выбранной фазы суток. */
