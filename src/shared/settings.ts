@@ -164,7 +164,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tools: { current: 'shovel', size: 50, softness: 40, ballSize: 26, strength: 100 },
   balls: { capSnow: true, max: 40 },
   snowmen: { limit: 12, speech: true, blink: true, wave: true },
-  plow: { enabled: true, speed: 55, size: 100, color: '#f4c430', count: 1, interval: 180, direction: 'alternate' },
+  plow: { enabled: true, speed: 55, size: 100, color: '#f4c430', count: 1, interval: 480, direction: 'alternate' },
   day: { mode: 'auto', phase: 'day', hour: 12, skyOpacity: 0, celestial: 60, presets: structuredClone(DEFAULT_PRESETS) },
   decor: { enabled: true, scale: 100, house: true, trees: true, garland: true, lantern: true, fence: true },
   effects: { splats: true, windowSnow: false },

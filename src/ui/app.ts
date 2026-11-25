@@ -23,6 +23,8 @@ export interface Light {
   hour: number;
   /** «Ночность» 0..1 (для фар, отсветов). */
   night: number;
+  /** Ближайшая фаза суток. */
+  phase?: string;
 }
 
 export interface App {

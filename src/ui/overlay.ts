@@ -617,6 +617,7 @@ async function runScenario(name: string): Promise<void> {
 
 window.__test = Object.assign(window.__test ?? {}, {
   prepare: () => {
+    (window.__test as unknown as { calm?: () => void }).calm?.();
     app.scene.fastForward(600);
     // для точных замеров объёма в тестах ввода снегопад останавливаем
     app.scene.apply({ snowfall: { intensity: 0 } });

@@ -119,6 +119,24 @@ const tail = (s) => s.out.slice(-500).replace(/\s+/g, ' ');
   check('мышью: собрать из 3 шаров, двойной клик → окошко, перетащить, ПКМ → растаял', !!i && i.customizeOpen === true && Math.abs(i.dragDx ?? 0) > 100 && i.snowmenAfterMelt === 0, i ? JSON.stringify({ customize: i.customizeOpen, dragDx: i.dragDx, afterMelt: i.snowmenAfterMelt }) : tail(s));
 }
 
+// ---------- этап 6: снегоуборщик, время суток, декор ----------
+{
+  const phases = ['dawn', 'morning', 'day', 'sunset', 'evening', 'night'];
+  const got = phases.map((p) => scenario('day-' + p));
+  const ok = got.every((g, k) => g.info && g.info.phase === phases[k]);
+  check('время суток: 6 фаз (рассвет…ночь)', ok, got.map((g) => g.info?.phase ?? '?').join(', ') + ' → tests/shots/day-*.png');
+}
+{
+  const s = scenario('plow-night');
+  const i = s.info;
+  check('снегоуборщик едет и срезает снег (ночью — фары)', !!i && i.plows === 1 && i.plowCleared > 100, i ? `убрано ${i.plowCleared}px² → ${s.shot}` : tail(s));
+}
+{
+  const s = scenario('decor-night');
+  const i = s.info;
+  check('декор: домик, ёлки, фонарь, забор; снег ложится на декор', !!i && i.decor >= 5 && Math.min(...i.decorSnow) > 0.3, i ? `предметов ${i.decor}, снег на них ${JSON.stringify(i.decorSnow)} → ${s.shot}` : tail(s));
+}
+
 rmSync(PROFILE, { recursive: true, force: true });
 const ok = results.every(Boolean);
 console.log(`\n${ok ? 'ALL PASS' : 'SOME FAILED'} (${results.filter(Boolean).length}/${results.length})`);
