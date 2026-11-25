@@ -615,7 +615,7 @@ async function runScenario(name: string): Promise<void> {
   api.scenarioDone(name, { error: 'unknown scenario' });
 }
 
-window.__test = {
+window.__test = Object.assign(window.__test ?? {}, {
   prepare: () => {
     app.scene.fastForward(600);
     // для точных замеров объёма в тестах ввода снегопад останавливаем
@@ -631,7 +631,7 @@ window.__test = {
   setBallSize: (r: number) => api.patchSettings({ tools: { ballSize: r } }),
   info: () => ({ ...fieldStats(), ...app.scene.testInfo() }),
   run: (name: string) => runScenario(name),
-} as unknown as Window['__test'];
+}) as unknown as Window['__test'];
 
 // ---------- старт ----------
 

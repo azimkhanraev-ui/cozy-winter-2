@@ -836,6 +836,14 @@ async function inputTest(name: string): Promise<void> {
     const yy = (await ground(x0)) + 2;
     await drag(x0, Math.round(yy), Math.round(W * 0.93), Math.round(yy), 60, 30);
     await wait(2000);
+    // ПКМ по шару — тает
+    const inf0 = await js<{ balls: number; radii: number[] }>('window.__test.info()');
+    const before = inf0.balls;
+    results.radiiBeforeMelt = inf0.radii;
+    const s0 = await js<[number, number]>('window.__test.ballPos(0)');
+    await click(Math.round(s0[0]), Math.round(s0[1]), 'right');
+    await wait(2500);
+    results.ballsBeforeMelt = before;
     Object.assign(results, await js('window.__test.info()'));
   } else if (name === 'snowman') {
     // собрать снеговика руками: три шара мышью, ставим друг на друга

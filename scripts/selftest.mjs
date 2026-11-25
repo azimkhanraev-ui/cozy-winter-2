@@ -87,6 +87,20 @@ const tail = (s) => s.out.slice(-500).replace(/\s+/g, ' ');
   check('ПКМ по пустому месту → пассивный режим', !!i && i.interactiveAfterPick === true && i.interactiveAfterRmb === false, i ? JSON.stringify({ a: i.interactiveAfterPick, b: i.interactiveAfterRmb }) : tail(s));
 }
 
+// ---------- этап 4: снежные шары ----------
+{
+  const s = scenario('balls');
+  const i = s.info;
+  check('шары S/M/L/XL лежат, стопка из трёх устойчива, ком катается с сохранением объёма', !!i && i.allSleeping && i.stackOrdered && i.rollVolumeErr < 1 && i.rollR > 20, i ? `шаров ${i.balls}, все спят=${i.allSleeping}, стопка=${i.stackOrdered}, ком r=${i.rollR}, ошибка объёма ${i.rollVolumeErr}px² → ${s.shot}` : tail(s));
+}
+{
+  const s = inputTest('balls');
+  const i = s.info;
+  const sizes = i?.radiiBeforeMelt ?? [];
+  const ok = !!i && [14, 26, 42, 60].every((r) => sizes.includes(r)) && sizes.some((r) => r > 20 && ![14, 26, 42, 60].includes(r)) && i.balls === i.ballsBeforeMelt - 1;
+  check('мышью: шары S/M/L/XL, бросок, «Катать», ПКМ растапливает', ok, i ? `радиусы ${JSON.stringify(sizes)}, шаров до/после ПКМ ${i.ballsBeforeMelt}/${i.balls} → ${s.shot}` : tail(s));
+}
+
 rmSync(PROFILE, { recursive: true, force: true });
 const ok = results.every(Boolean);
 console.log(`\n${ok ? 'ALL PASS' : 'SOME FAILED'} (${results.filter(Boolean).length}/${results.length})`);
