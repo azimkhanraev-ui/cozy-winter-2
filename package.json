@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "selftest": "node scripts/selftest.mjs",
     "dist": "node scripts/dist.mjs",
-    "icon": "node scripts/make-icon.mjs"
+    "icon": "node scripts/make-icon.mjs",
+    "site": "node scripts/build-site.mjs"
   },
   "devDependencies": {
     "electron": "45.4.1",

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cozy Winter 2 — живая зима на рабочем столе Windows</title>
+<meta name="description" content="Снег идёт прямо поверх рабочего стола Windows и копится сугробами на панели задач. Лопата, снежки, снеговики, снегоуборщик, смена дня и ночи.">
+<link rel="icon" href="icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#"><img src="icon.png" alt=""> Cozy Winter 2</a>
+  <nav><a href="#demo-sec">Демо</a><a href="#features">Возможности</a><a href="#download">Скачать</a></nav>
+</header>
+
+<section class="hero">
+  <div class="hero-text">
+    <h1>Живая зима поверх рабочего стола</h1>
+    <p>Снег падает прямо на экран и по-настоящему копится на панели задач — неровными сугробами, с намётами за препятствиями.
+      Убирайте его лопатой, катайте снежки, лепите снеговиков. Клики по рабочему столу проходят сквозь снег — работать он не мешает.</p>
+    <p class="cta"><a class="btn" href="#download" data-download>Скачать для Windows</a><span class="muted">Windows 10/11, бесплатно</span></p>
+  </div>
+</section>
+
+<section id="demo-sec" class="demo-sec">
+  <h2>Попробуйте прямо здесь</h2>
+  <p class="muted" id="demo-hint">Кликните по снегу — появится шар.</p>
+  <div class="demo-wrap">
+    <canvas id="demo"></canvas>
+  </div>
+  <div class="hours">
+    <button data-hour="7">Рассвет</button>
+    <button data-hour="12.5">День</button>
+    <button data-hour="17.4">Закат</button>
+    <button data-hour="21" class="active">Вечер</button>
+    <button data-hour="23.5">Ночь</button>
+  </div>
+  <p class="muted small">Это та же физика и отрисовка, что и в программе: снег, сугробы, шары, снеговики. В программе всё это — прозрачным слоем на вашем экране.</p>
+</section>
+
+<section id="features" class="features">
+  <h2>Что умеет</h2>
+  <div class="grid">
+    <article><h3>Настоящий снег</h3><p>Четыре слоя глубины, ветер с порывами, хлопья разных видов. Сугробы растут неравномерно, осыпаются по углу откоса, ветер наметает их за препятствиями.</p></article>
+    <article><h3>Уборка</h3><p>Лопата отбрасывает снег валиками, ластик, снегодув, фен, «насыпать», «очистить всё» порывом ветра. Отмена и повтор действий.</p></article>
+    <article><h3>Снежки и снеговики</h3><p>Шары с физикой: падают, катаются, их можно бросать. Ком растёт, собирая снег. Три шара друг на друге становятся снеговиком — у каждого своя шапка, шарф и имя.</p></article>
+    <article><h3>Снегоуборщик</h3><p>Иногда проезжает сам и расчищает снег, объезжая снеговиков. Им можно порулить стрелками и посигналить.</p></article>
+    <article><h3>Время суток</h3><p>Рассвет, день, закат, вечер, ночь — по часам Windows. Ночью светятся окна домика, гирлянда и фонарь, бывает северное сияние.</p></article>
+    <article><h3>Не мешает работать</h3><p>Клики проходят сквозь снег. Пауза при полноэкранных играх и видео, режим экономии от батареи, несколько мониторов.</p></article>
+  </div>
+</section>
+
+<section id="download" class="download">
+  <h2>Скачать</h2>
+  <p><a class="btn" href="#build" data-download>Скачать для Windows</a></p>
+  <p class="muted" id="dl-note">Установщик или переносная версия (без установки). После запуска в трее появится снежинка, инструменты — по клику на неё внизу экрана или <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd>.</p>
+  <div id="build" class="build">
+    <h3>Собрать самому</h3>
+    <p>Нужен Node.js 20+:</p>
+    <pre><code>npm install
+npm start          # запустить
+npm run dist       # установщик и portable .exe в release/</code></pre>
+  </div>
+</section>
+
+<footer>
+  <p>Cozy Winter 2 · Сайт без счётчиков и трекеров: ничего не собирает и никуда не отправляет. Программа тоже работает полностью офлайн.</p>
+</footer>
+
+<script src="config.js"></script>
+<script>
+  // кнопки «Скачать»: на страницу релизов GitHub, если она указана в config.js
+  (function () {
+    var url = (window.COZY_SITE && window.COZY_SITE.releasesUrl) || '';
+    if (!url) return;
+    document.querySelectorAll('[data-download]').forEach(function (a) { a.href = url; a.rel = 'noopener'; });
+    var b = document.getElementById('build');
+    if (b) b.querySelector('h3').textContent = 'Или собрать самому';
+  })();
+</script>
+<script src="demo.js"></script>
+</body>
+</html>

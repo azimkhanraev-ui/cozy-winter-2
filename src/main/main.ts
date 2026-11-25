@@ -6,7 +6,7 @@ import {
 } from 'electron';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { spawn as spawnChild } from 'node:child_process';
+import { spawn as spawnChild, execFileSync } from 'node:child_process';
 import { SettingsStore } from './settingsStore';
 import { snowflakeBitmap } from './icon';
 import { WinHelper } from './winhelper';
@@ -520,6 +520,23 @@ function saveScene(key: string, data: unknown): void {
 
 // ---------- система: автозапуск, экономия, автопауза, снег на окнах ----------
 
+const RUN_KEY = String.raw`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`;
+const RUN_NAME = 'Cozy Winter 2';
+
+/** Есть ли запись автозапуска (значение в HKCU\...\Run). */
+function autostartEnabled(): boolean {
+  try {
+    const out = execFileSync('reg.exe', ['query', RUN_KEY, '/v', RUN_NAME], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
+    return out.includes(RUN_NAME);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Автозапуск: значение «Cozy Winter 2» в HKCU\Software\Microsoft\Windows\CurrentVersion\Run.
+ * Пишем через reg.exe напрямую: app.setLoginItemSettings на этой машине молча ничего не записывал.
+ */
 function applyAutostart(): void {
   if (!app.isPackaged) {
     // в режиме разработки в автозапуск попал бы голый electron.exe — не трогаем реестр
@@ -528,7 +545,13 @@ function applyAutostart(): void {
   }
   // portable-сборка запускается из временной папки — для неё берём путь исходного exe
   const exe = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
-  app.setLoginItemSettings({ openAtLogin: store.settings.system.autostart, path: exe, args: [] });
+  const want = store.settings.system.autostart;
+  try {
+    if (want) execFileSync('reg.exe', ['add', RUN_KEY, '/v', RUN_NAME, '/t', 'REG_SZ', '/d', `"${exe}"`, '/f'], { windowsHide: true, stdio: 'ignore' });
+    else if (autostartEnabled()) execFileSync('reg.exe', ['delete', RUN_KEY, '/v', RUN_NAME, '/f'], { windowsHide: true, stdio: 'ignore' });
+  } catch (e) {
+    console.warn('[autostart] не удалось изменить автозапуск:', e);
+  }
 }
 
 function updateEconomy(): void {
@@ -1038,9 +1061,15 @@ app.whenReady().then(() => {
       const js = <R = unknown>(code: string) => ov!.win.webContents.executeJavaScript(code) as Promise<R>;
       for (let i = 0; i < 100 && !helper.last; i++) await wait(200);
       res.helperReady = !!helper.last;
+      const testwin = path.join(ROOT, 'scripts', 'testwin.cjs');
+      // в собранной версии тестового окна нет — нельзя запускать exe с незнакомым аргументом
+      // (запустился бы обычный экземпляр программы с настоящим профилем)
+      if (!fs.existsSync(testwin)) {
+        res.fullscreen = 'skip: нет scripts/testwin.cjs (собранная версия)';
+      } else {
       const env: NodeJS.ProcessEnv = { ...process.env, FULLSCREEN: '1', CLOSE_AFTER: '9000' };
       delete env.ELECTRON_RUN_AS_NODE;
-      const child = spawnChild(process.execPath, [path.join(ROOT, 'scripts', 'testwin.cjs')], { env, stdio: 'ignore' });
+      const child = spawnChild(process.execPath, [testwin], { env, stdio: 'ignore' });
       let paused = false;
       for (let i = 0; i < 40 && !paused; i++) {
         await wait(200);
@@ -1057,6 +1086,7 @@ app.whenReady().then(() => {
       }
       res.resumedAfterClose = resumed;
       res.overlayVisibleAgain = ov ? ov.win.isVisible() : null;
+      }
       // экономия
       applyPatch({ system: { economy: 'on' } });
       await wait(300);
@@ -1066,12 +1096,15 @@ app.whenReady().then(() => {
       res.normalFps = ov ? await js('window.__test.fps()') : null;
       // автозапуск (HKCU\Software\Microsoft\Windows\CurrentVersion\Run) — только в установленной версии; сразу возвращаем как было
       if (app.isPackaged) {
-        const was = app.getLoginItemSettings().openAtLogin;
+        const was = autostartEnabled();
         applyPatch({ system: { autostart: true } });
-        res.autostartOn = app.getLoginItemSettings({ path: process.env.PORTABLE_EXECUTABLE_FILE || process.execPath }).openAtLogin;
+        res.autostartOn = autostartEnabled();
         applyPatch({ system: { autostart: false } });
-        res.autostartOff = !app.getLoginItemSettings({ path: process.env.PORTABLE_EXECUTABLE_FILE || process.execPath }).openAtLogin;
-        if (was) app.setLoginItemSettings({ openAtLogin: true });
+        res.autostartOff = !autostartEnabled();
+        if (was) {
+          store.update({ system: { autostart: true } });
+          applyAutostart();
+        }
       } else res.autostart = 'dev: проверяется в собранной версии';
       console.log(`[system-check] ${JSON.stringify(res)}`);
       finish(0);
@@ -1155,7 +1188,13 @@ app.whenReady().then(() => {
       // окно другого процесса (свои окна помощник намеренно пропускает)
       const env: NodeJS.ProcessEnv = { ...process.env, MOVE_AFTER: '28000' };
       delete env.ELECTRON_RUN_AS_NODE;
-      const child = spawnChild(process.execPath, [path.join(ROOT, 'scripts', 'testwin.cjs')], { env, stdio: 'ignore' });
+      const tw = path.join(ROOT, 'scripts', 'testwin.cjs');
+      if (!fs.existsSync(tw)) {
+        console.log('[ledge-test] skip: нет scripts/testwin.cjs (собранная версия)');
+        finish(0);
+        return;
+      }
+      const child = spawnChild(process.execPath, [tw], { env, stdio: 'ignore' });
       const ov = [...sceneWins.values()].find((x) => x.overlay)!;
       await wait(2500);
       await ov.win.webContents.executeJavaScript('window.__test.boostSnow()');
