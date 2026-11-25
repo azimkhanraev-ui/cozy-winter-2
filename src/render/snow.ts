@@ -64,17 +64,71 @@ export class SnowRenderer {
     ctx.globalAlpha = 1;
   }
 
+  private smoke: HTMLCanvasElement | null = null;
+  /** Серо-голубой мягкий клуб дыма. */
+  private smokeSprite(): HTMLCanvasElement {
+    if (this.smoke) return this.smoke;
+    const c = document.createElement('canvas');
+    c.width = c.height = 48;
+    const g = c.getContext('2d')!;
+    const gr = g.createRadialGradient(24, 24, 2, 24, 24, 24);
+    gr.addColorStop(0, 'rgba(210,214,224,0.9)');
+    gr.addColorStop(0.6, 'rgba(180,188,204,0.45)');
+    gr.addColorStop(1, 'rgba(170,180,200,0)');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 48, 48);
+    return (this.smoke = c);
+  }
+
   drawParticles(ctx: CanvasRenderingContext2D, ps: Particle[]): void {
     // Снежная пыль: мягкое размытое пятно, расплывается и вытягивается по ветру.
-    const sp = this.sprites.get(FlakeType.Soft, 0, true);
+    const blur = this.sprites.get(FlakeType.Soft, 0, true);
+    const softS = this.sprites.get(FlakeType.Soft, 0, false);
     const m = ctx.getTransform();
     for (const p of ps) {
-      const k = p.life / p.maxLife;
-      ctx.globalAlpha = 0.22 * Math.sin(Math.PI * k);
-      const d = p.r * (2 + 5 * k) * sp.scale;
-      const stretch = 1 + Math.min(2.5, Math.abs(p.vx) / 90);
-      ctx.setTransform(m.a * stretch, 0, 0, m.d, p.x * m.a, p.y * m.d);
-      ctx.drawImage(sp.canvas, -d / 2, -d / 2, d, d);
+      const k = Math.min(1, p.life / p.maxLife);
+      switch (p.kind) {
+        case 'dust': {
+          ctx.globalAlpha = 0.22 * Math.sin(Math.PI * k);
+          const d = p.r * (2 + 5 * k) * blur.scale;
+          const stretch = 1 + Math.min(2.5, Math.abs(p.vx) / 90);
+          ctx.setTransform(m.a * stretch, 0, 0, m.d, p.x * m.a, p.y * m.d);
+          ctx.drawImage(blur.canvas, -d / 2, -d / 2, d, d);
+          ctx.setTransform(m);
+          break;
+        }
+        case 'puff':
+        case 'smoke': {
+          ctx.globalAlpha = (p.kind === 'smoke' ? 0.28 : 0.5) * (1 - k);
+          const d = p.r * blur.scale;
+          ctx.drawImage(p.kind === 'smoke' ? this.smokeSprite() : blur.canvas, p.x - d / 2, p.y - d / 2, d, d);
+          break;
+        }
+        case 'chunk':
+        case 'carrier':
+        case 'swirl': {
+          ctx.globalAlpha = p.kind === 'chunk' ? 0.95 : 0.85;
+          const d = p.r * softS.scale;
+          ctx.drawImage(softS.canvas, p.x - d / 2, p.y - d / 2, d, d);
+          break;
+        }
+        case 'drop': {
+          ctx.globalAlpha = 0.75 * (1 - k * 0.5);
+          ctx.fillStyle = '#9fd3ff';
+          ctx.beginPath();
+          ctx.ellipse(p.x, p.y, p.r * 0.8, p.r * 1.4, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(p.x - p.r * 0.3, p.y - p.r * 0.6, p.r * 0.4, p.r * 0.4);
+          break;
+        }
+        case 'spark': {
+          ctx.globalAlpha = 1 - k;
+          const d = p.r * 3.6;
+          ctx.drawImage(this.spark, p.x - d / 2, p.y - d / 2, d, d);
+          break;
+        }
+      }
     }
     ctx.setTransform(m);
     ctx.globalAlpha = 1;

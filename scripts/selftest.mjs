@@ -22,11 +22,22 @@ function scenario(name, mode = '--windowed') {
   return { info: m ? JSON.parse(m[1]) : null, shot: shot?.[1], out: r.out };
 }
 
+/** Тест реальным вводом мыши (sendInputEvent): возвращает JSON-итог и путь к снимку. */
+function inputTest(name) {
+  rmSync(PROFILE, { recursive: true, force: true });
+  const r = spawnSync(electron, ['.', `--user-data=${PROFILE}`, '--windowed', `--input-test=${name}`], { env, encoding: 'utf8', timeout: 240000 });
+  const out = (r.stdout ?? '') + (r.stderr ?? '');
+  const m = out.match(new RegExp(String.raw`\[input-test\] ` + name + String.raw` (\{.*\})`));
+  const shot = out.match(/\[shot\] (.+?\.png)/);
+  return { info: m ? JSON.parse(m[1]) : null, shot: shot?.[1], out, code: r.status };
+}
+
 const results = [];
 const check = (name, ok, detail) => {
   results.push(ok);
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`);
 };
+const tail = (s) => s.out.slice(-500).replace(/\s+/g, ' ');
 
 // 1. Трей: реальные пункты меню
 {
@@ -52,6 +63,28 @@ const check = (name, ok, detail) => {
 {
   const s = scenario('snow60', '--overlay');
   check('оверлей поверх рабочего стола', !!s.info && !!s.shot, s.shot ?? s.out.slice(-400));
+}
+
+// ---------- этап 3: уборка снега ----------
+{
+  const s = scenario('shovel');
+  const i = s.info;
+  check('лопата убирает полосу, объём сохраняется, валик без стенок', !!i && Math.abs(i.volumeDelta) < 0.01 && i.stripMax < 5 && i.slopeViolation < 0.1, i ? `Δобъёма=${(i.volumeDelta * 100).toFixed(2)}% снег в полосе ≤ ${i.stripMax}px, превышение откоса ${i.slopeViolation} → ${s.shot}` : tail(s));
+}
+{
+  const s = inputTest('tools');
+  const i = s.info;
+  check('мышью через док: лопата, ластик, снегодув, тепло, насыпать', !!i && Math.abs(i.shovelVolumeDelta) < 0.01, i ? `Δобъёма лопаты=${(i.shovelVolumeDelta * 100).toFixed(2)}% → ${s.shot}` : tail(s));
+}
+{
+  const s = inputTest('undo');
+  const i = s.info;
+  check('Undo/Redo: 22 шага', !!i && i.undoRestored && i.redoRestored && i.v1 < i.v0 * 0.9, i ? `объём ${Math.round(i.v0)} → ${Math.round(i.v1)} → undo ${Math.round(i.v2)} → redo ${Math.round(i.v3)}` : tail(s));
+}
+{
+  const s = inputTest('escape');
+  const i = s.info;
+  check('ПКМ по пустому месту → пассивный режим', !!i && i.interactiveAfterPick === true && i.interactiveAfterRmb === false, i ? JSON.stringify({ a: i.interactiveAfterPick, b: i.interactiveAfterRmb }) : tail(s));
 }
 
 rmSync(PROFILE, { recursive: true, force: true });

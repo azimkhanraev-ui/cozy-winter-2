@@ -153,7 +153,7 @@ export class Snowfall {
    * Шаг: ветер, покачивание, оседание на снег.
    * onLand получает хлопья, долетевшие до поверхности (уже после добавления снега в карту).
    */
-  step(dt: number, wind: Wind, field: SnowField | null): void {
+  step(dt: number, wind: Wind, field: SnowField | null, catcher?: (f: Flake) => boolean): void {
     const r = this.rng;
     const p = this.params;
     // Рождение
@@ -207,6 +207,12 @@ export class Snowfall {
       if (f.x < -40) f.x += W + 80;
       else if (f.x > W + 40) f.x -= W + 80;
 
+      // хлопья, долетевшие до объекта (шар, снеговик, декор, край окна), остаются на нём
+      if (L.lands && catcher && catcher(f)) {
+        this.landed++;
+        f.rest = r.range(0.4, 1.4);
+        continue;
+      }
       if (L.lands && field) {
         const surf = H - field.heightAt(f.x);
         if (f.y + f.r * 0.3 >= surf) {

@@ -241,14 +241,16 @@ export class SnowField {
    * снег только перекладывается между соседними колонками, основа не двигается.
    * Возвращает максимальное превышение уклона до прохода.
    */
-  relax(passes = 2, rate = 0.5): number {
+  relax(passes = 2, rate = 0.5, from = 0, to = this.n - 1): number {
     const maxD = this.maxDiff;
-    const { base, snow, fresh, n } = this;
+    const { base, snow, fresh } = this;
+    const a0 = Math.max(0, from);
+    const a1 = Math.min(this.n - 1, to);
     let worst = 0;
     for (let p = 0; p < passes; p++) {
       const fwd = (p & 1) === 0;
-      for (let k = 0; k < n - 1; k++) {
-        const i = fwd ? k : n - 2 - k;
+      for (let k = a0; k < a1; k++) {
+        const i = fwd ? k : a1 - 1 - (k - a0);
         const j = i + 1;
         const d = base[i] + snow[i] - (base[j] + snow[j]);
         let hi: number, lo: number, ex: number;
@@ -269,6 +271,18 @@ export class SnowField {
     }
     if (worst > 0) this.revision++;
     return worst;
+  }
+
+  /**
+   * Мгновенная лавина в окрестности колонки (после лопаты/насыпания большого объёма):
+   * без неё на месте валика на несколько секунд вырастал бы вертикальный столб.
+   */
+  settleAround(x: number, radiusPx = 700, maxIter = 600, eps = 0.05): number {
+    const c = Math.round(x / COL_W);
+    const r = Math.round(radiusPx / COL_W);
+    let w = Infinity;
+    for (let it = 0; it < maxIter && w > eps; it++) w = this.relax(2, 0.5, c - r, c + r);
+    return w;
   }
 
   /** Осыпать до устойчивого состояния (для тестов и «Присыпать сразу»). */

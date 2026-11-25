@@ -15,6 +15,14 @@ export class GroundRenderer {
   private dpr = 1;
   private lastRev = -1;
   private lastDraw = -1e9;
+  /** Цвет снега (время суток). */
+  private tint = '#ffffff';
+  setTint(c: string): void {
+    if (c !== this.tint) {
+      this.tint = c;
+      this.lastRev = -1;
+    }
+  }
   /** Сглаженные высоты опорных точек (используются и для искорок). */
   pts: Float32Array = new Float32Array(0);
 
@@ -199,6 +207,15 @@ export class GroundRenderer {
     g.beginPath();
     this.curve(g, h, B, 0.2);
     g.stroke();
+    // цвет снега в разное время суток: умножение только по самому снегу
+    if (this.tint !== '#ffffff') {
+      g.save();
+      g.clip(shape);
+      g.globalCompositeOperation = 'multiply';
+      g.fillStyle = this.tint;
+      g.fillRect(0, 0, W, B);
+      g.restore();
+    }
   }
 
   draw(ctx: CanvasRenderingContext2D, groundY: number): void {

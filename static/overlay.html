@@ -2,16 +2,61 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
 <title>Cozy Winter 2</title>
 <style>
-  html, body { margin: 0; padding: 0; overflow: hidden; background: transparent; width: 100%; height: 100%; user-select: none; }
+  html, body { margin: 0; padding: 0; overflow: hidden; background: transparent; width: 100%; height: 100%; user-select: none; font: 13px/1.3 "Segoe UI", system-ui, sans-serif; }
   body.windowed { background: radial-gradient(ellipse at 30% 10%, #2a3b57 0%, #18233a 45%, #0d1422 100%); }
   canvas { position: fixed; left: 0; top: 0; display: block; }
-  #fps { display: none; position: fixed; left: 8px; top: 6px; font: 12px/1.2 Segoe UI, sans-serif; color: #cfe3ff; background: rgba(0,0,0,.35); padding: 3px 6px; border-radius: 4px; }
+  #fps { display: none; position: fixed; left: 8px; top: 6px; color: #cfe3ff; background: rgba(0,0,0,.35); padding: 3px 6px; border-radius: 4px; }
+
+  .dock { position: fixed; display: flex; align-items: center; gap: 2px; padding: 6px 8px; border-radius: 16px;
+    background: rgba(18, 28, 46, 0.78); border: 1px solid rgba(160, 200, 255, 0.25);
+    box-shadow: 0 8px 28px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08);
+    backdrop-filter: blur(10px); transition: opacity .25s, transform .25s; z-index: 10; }
+  .dock.hidden { opacity: 0; transform: translateY(30px); pointer-events: none; }
+  .dock .btn, .dock .grip { width: 38px; height: 38px; border: 0; border-radius: 10px; background: transparent; padding: 0; cursor: pointer; display: grid; place-items: center; }
+  .dock .grip { width: 18px; cursor: grab; opacity: .6; }
+  .dock .grip img { width: 18px; height: 18px; }
+  .dock .btn img { width: 26px; height: 26px; pointer-events: none; }
+  .dock .btn:hover { background: rgba(160, 200, 255, 0.16); }
+  .dock .btn.active { background: rgba(124, 196, 255, 0.32); box-shadow: inset 0 0 0 1px rgba(160, 215, 255, .7); }
+  .dock .sep { width: 1px; height: 26px; background: rgba(160, 200, 255, 0.2); margin: 0 4px; }
+  .dock .size { display: flex; align-items: center; gap: 6px; color: #cfe3ff; padding: 0 4px; }
+  .dock .size input { width: 90px; accent-color: #7cc4ff; }
+  .dock .size span { min-width: 24px; font-variant-numeric: tabular-nums; }
+  .dock-tab { position: fixed; width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(160,200,255,.35);
+    background: rgba(18, 28, 46, 0.7); cursor: pointer; display: grid; place-items: center; padding: 0; z-index: 10;
+    box-shadow: 0 4px 16px rgba(0,0,0,.3); transition: opacity .25s, transform .25s; }
+  .dock-tab:hover { transform: scale(1.08); background: rgba(30, 48, 78, 0.85); }
+  .dock-tab.hidden { opacity: 0; pointer-events: none; transform: scale(.6); }
+  .dock-tip { position: fixed; padding: 5px 9px; border-radius: 7px; background: rgba(10, 16, 28, 0.92); color: #eaf3ff;
+    white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .12s; z-index: 20; border: 1px solid rgba(160,200,255,.2); }
+
+  .toast { position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%); padding: 8px 14px; border-radius: 10px;
+    background: rgba(10, 16, 28, 0.9); color: #eaf3ff; z-index: 30; pointer-events: none; transition: opacity .4s; max-width: 70vw; }
+  .hint { position: fixed; padding: 5px 10px; border-radius: 8px; background: rgba(255, 250, 235, 0.95); color: #3a2a10;
+    box-shadow: 0 3px 12px rgba(0,0,0,.25); z-index: 25; pointer-events: none; transition: opacity .3s; white-space: nowrap; }
+  .bubble { position: fixed; padding: 6px 10px; border-radius: 12px; background: #fff; color: #1d2a3d; z-index: 15;
+    box-shadow: 0 3px 10px rgba(0,0,0,.25); pointer-events: none; max-width: 220px; transition: opacity .3s; font-size: 12.5px; }
+  .bubble::after { content: ''; position: absolute; left: 16px; bottom: -7px; border: 7px solid transparent; border-top-color: #fff; border-bottom: 0; }
+  .popup { position: fixed; z-index: 40; width: 250px; padding: 12px 14px; border-radius: 14px; background: rgba(18, 28, 46, 0.95);
+    color: #e6efff; border: 1px solid rgba(160,200,255,.3); box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+  .popup h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+  .popup label { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 6px 0; }
+  .popup input[type=text], .popup select { width: 130px; background: #1c2a40; color: #e6efff; border: 1px solid #2c3f5c; border-radius: 6px; padding: 4px 6px; font: inherit; }
+  .popup input[type=color] { width: 40px; height: 24px; border: 0; background: none; }
+  .popup .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+  .popup button { background: #24395a; color: #e6efff; border: 1px solid #36507a; border-radius: 8px; padding: 5px 12px; cursor: pointer; font: inherit; }
+  .tour { position: fixed; z-index: 45; width: 300px; padding: 14px 16px; border-radius: 14px; background: rgba(18, 28, 46, 0.96); color: #e6efff;
+    border: 1px solid rgba(160,200,255,.35); box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+  .tour .step { color: #7cc4ff; font-size: 12px; margin-bottom: 4px; }
+  .tour .row { display: flex; justify-content: flex-end; margin-top: 10px; }
+  .tour button { background: #2b4f80; color: #fff; border: 0; border-radius: 8px; padding: 6px 14px; cursor: pointer; font: inherit; }
 </style>
 </head>
 <body>
+<canvas id="sky"></canvas>
 <canvas id="far"></canvas>
 <canvas id="scene"></canvas>
 <div id="fps"></div>
